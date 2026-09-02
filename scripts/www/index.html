@@ -1,0 +1,2527 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HEKO Solar · 阳台光伏协议解析器</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* =========================================================
+   HEKO Solar Protocol Analyzer
+   Focus: HEX parsing + Protocol reference
+   Stack: vanilla HTML/CSS/JS, single file, i18n + dual theme
+   ========================================================= */
+
+/* ===== Tokens: DARK (default) ===== */
+:root, [data-theme="dark"] {
+  --bg-0:        #0B1220;
+  --bg-1:        #111B2E;
+  --bg-2:        #182338;
+  --bg-3:        #1F2C46;
+  --bg-input:    #060D1A;
+  --fg-0:        #F1F5F9;
+  --fg-1:        #CBD5E1;
+  --fg-2:        #94A3B8;
+  --fg-3:        #64748B;
+  --accent:      #22C55E;
+  --accent-dim:  #16A34A;
+  --accent-soft: rgba(34,197,94,.12);
+  --accent-glow: 0 0 24px rgba(34,197,94,.18);
+  --warn:        #F59E0B;
+  --warn-soft:   rgba(245,158,11,.12);
+  --danger:      #EF4444;
+  --danger-soft: rgba(239,68,68,.12);
+  --info:        #38BDF8;
+  --info-soft:   rgba(56,189,248,.12);
+  --violet:      #A78BFA;
+  --amber:       #FBBF24;
+  --border:        rgba(255,255,255,.08);
+  --border-strong: rgba(255,255,255,.16);
+  --glass:         rgba(255,255,255,.04);
+  --glass-strong:  rgba(255,255,255,.07);
+  --code-bg:       #060D1A;
+  --code-fg:       #94A3B8;
+  --code-border:   rgba(56,189,248,.18);
+  --shadow-md: 0 4px 16px rgba(0,0,0,.35);
+  --topbar-bg: linear-gradient(180deg, rgba(17,27,46,.85), rgba(17,27,46,.55));
+  --sidebar-bg: linear-gradient(180deg, rgba(17,27,46,.92), rgba(11,18,32,.95));
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:20px;
+  --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px; --s-5:20px; --s-6:24px; --s-7:32px;
+  --font-ui: 'Inter', 'Noto Sans SC', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-mono: 'Fira Code', 'JetBrains Mono', Consolas, 'Courier New', monospace;
+  color-scheme: dark;
+}
+
+/* ===== Tokens: LIGHT ===== */
+[data-theme="light"] {
+  --bg-0:        #F8FAFC;
+  --bg-1:        #FFFFFF;
+  --bg-2:        #F1F5F9;
+  --bg-3:        #E2E8F0;
+  --bg-input:    #FFFFFF;
+  --fg-0:        #0F172A;
+  --fg-1:        #1E293B;
+  --fg-2:        #475569;
+  --fg-3:        #94A3B8;
+  --accent:      #16A34A;
+  --accent-dim:  #15803D;
+  --accent-soft: rgba(22,163,74,.10);
+  --accent-glow: 0 0 0 3px rgba(22,163,74,.12);
+  --warn:        #D97706;
+  --warn-soft:   rgba(217,119,6,.10);
+  --danger:      #DC2626;
+  --danger-soft: rgba(220,38,38,.10);
+  --info:        #0284C7;
+  --info-soft:   rgba(2,132,199,.10);
+  --violet:      #7C3AED;
+  --amber:       #D97706;
+  --border:        rgba(15,23,42,.08);
+  --border-strong: rgba(15,23,42,.16);
+  --glass:         rgba(15,23,42,.02);
+  --glass-strong:  rgba(15,23,42,.04);
+  --code-bg:       #F1F5F9;
+  --code-fg:       #475569;
+  --code-border:   rgba(15,23,42,.10);
+  --shadow-md: 0 4px 12px rgba(15,23,42,.06);
+  --topbar-bg: rgba(255,255,255,.85);
+  --sidebar-bg: linear-gradient(180deg, #FFFFFF, #F8FAFC);
+  color-scheme: light;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--fg-0);
+  background:
+    radial-gradient(1200px 600px at 80% -10%, var(--accent-soft), transparent 60%),
+    radial-gradient(900px 500px at -10% 30%, var(--info-soft), transparent 60%),
+    var(--bg-0);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+  transition: background-color .25s, color .25s;
+}
+
+/* ====== Global thin scrollbars (both themes) ====== */
+* { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; border: 2px solid transparent; background-clip: padding-box; }
+*::-webkit-scrollbar-thumb:hover { background: var(--fg-3); background-clip: padding-box; }
+*::-webkit-scrollbar-corner { background: transparent; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.icon-btn, .icon-btn * { -webkit-tap-highlight-color: transparent; }
+
+/* ===== Layout ===== */
+.app {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  grid-template-rows: 56px 1fr;
+  height: 100vh;
+  grid-template-areas: "sidebar topbar" "sidebar main";
+  transition: grid-template-columns .2s ease;
+}
+@media (max-width: 900px) { .app { grid-template-columns: 64px 1fr; } .sidebar .nav-label, .sidebar .brand-sub { display:none; } }
+
+/* ===== Sidebar ===== */
+.sidebar {
+  grid-area: sidebar;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--border);
+  backdrop-filter: blur(16px);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.brand { padding: 16px 20px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border); }
+.brand-mark {
+  width: 36px; height: 36px; border-radius: 10px;
+  display: grid; place-items: center;
+}
+.brand-mark svg { width:32px; height:32px; }
+.brand-text { line-height: 1.1; }
+.brand-name { font-weight:700; font-size:14px; color: var(--fg-0); letter-spacing:.2px; }
+.brand-sub { font-size:11px; color: var(--fg-2); font-family: var(--font-mono); margin-top:2px; }
+
+.nav { padding: 8px; overflow-y: auto; flex: 1; }
+.nav::-webkit-scrollbar { width:6px; }
+.nav::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius:3px; }
+
+.nav-section {
+  font-size: 10px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase;
+  color: var(--fg-3); padding: 14px 12px 6px; display: flex; align-items: center; gap: 6px;
+}
+.nav-section svg { width:12px; height:12px; opacity:.7; }
+.nav-item {
+  position: relative;
+  display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+  border-radius: 8px; cursor: pointer; color: var(--fg-1);
+  font-size: 13px; font-weight: 500; transition: background .15s, color .15s;
+  user-select: none; border: 1px solid transparent;
+}
+.nav-item:hover { background: var(--glass); color: var(--fg-0); }
+.nav-item.active { background: var(--accent-soft); color: var(--accent); border-color: var(--border); font-weight: 600; }
+.nav-item.active::before {
+  content: ''; position: absolute; left: -1px; top: 22%; bottom: 22%;
+  width: 3px; border-radius: 2px; background: var(--accent);
+}
+.nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+/* nav-tag removed in V1.1.1 — kept as a safety net in case legacy code adds it back */
+.nav-item .nav-tag { display: none; }
+
+.sidebar-toggle {
+  margin: 12px; padding: 8px 12px; display: flex; align-items: center; gap: 10px;
+  background: transparent; border: 1px solid transparent; border-radius: 8px;
+  color: var(--fg-2); font-size: 13px; font-weight: 500; font-family: inherit;
+  cursor: pointer; transition: background .15s, color .15s; user-select: none;
+}
+.sidebar-toggle:hover { background: var(--glass); color: var(--fg-0); }
+.sidebar-toggle svg { transition: transform .2s; }
+
+/* Collapsed sidebar — icon rail, labels hidden, chevron flips to point right */
+.app.sidebar-collapsed { grid-template-columns: 64px 1fr; }
+.sidebar-collapsed .brand { justify-content: center; padding-left: 8px; padding-right: 8px; }
+.sidebar-collapsed .brand-text,
+.sidebar-collapsed .nav-label { display: none; }
+.sidebar-collapsed .nav-item,
+.sidebar-collapsed .sidebar-toggle { justify-content: center; padding-left: 0; padding-right: 0; }
+.sidebar-collapsed .sidebar-toggle { margin-left: auto; margin-right: auto; }
+.sidebar-collapsed .sidebar-toggle svg { transform: rotate(180deg); }
+
+/* ===== Topbar ===== */
+.topbar {
+  grid-area: topbar; background: var(--topbar-bg);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(16px);
+  display: flex; align-items: center; padding: 0 24px; gap: 8px;
+}
+.crumb { color: var(--fg-2); font-size: 13px; display:flex; align-items:center; gap:8px; margin-right: 8px; }
+.crumb .sep { opacity:.4; }
+.crumb strong { color: var(--fg-0); font-weight: 600; }
+.topbar-spacer { flex: 1; }
+.status-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 20px;
+  background: var(--accent-soft); color: var(--accent);
+  font-size: 11px; font-weight: 600; border: 1px solid var(--border);
+}
+.status-chip .dot { width:6px; height:6px; border-radius:50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+.icon-btn {
+  width: 32px; height: 32px; background: var(--glass);
+  border: 1px solid var(--border); border-radius: 8px;
+  color: var(--fg-1); cursor: pointer;
+  display: grid; place-items: center; transition: all .15s;
+  position: relative;
+}
+.icon-btn:hover { background: var(--glass-strong); color: var(--fg-0); }
+.icon-btn svg { width:16px; height:16px; }
+/* Lang button: square chip, same 32×32 as the theme button so they sit flush. */
+.icon-btn-lang { width: 32px; height: 32px; }
+.icon-btn-lang .lang-label { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; font-size: 11px; font-weight: 700; font-family: var(--font-mono); letter-spacing: 0.3px; color: var(--fg-1); }
+.icon-btn-lang:hover .lang-label { color: var(--fg-0); }
+
+/* ===== Main ===== */
+.main { grid-area: main; overflow-y: auto; padding: 24px; }
+.main::-webkit-scrollbar { width:8px; }
+.main::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius:4px; }
+
+.page-head { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+.page-title { font-size: 22px; font-weight: 700; letter-spacing: -.3px; }
+.page-sub { color: var(--fg-2); font-size: 13px; margin-top: 4px; font-family: var(--font-mono); }
+.page-tags { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+.tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; font-size: 11px; font-weight: 600; border-radius: 6px; font-family: var(--font-mono); }
+.tag-r { background: var(--info-soft); color: var(--info); border:1px solid var(--border); }
+.tag-rw { background: var(--warn-soft); color: var(--warn); border:1px solid var(--border); }
+.tag-dp { background: var(--accent-soft); color: var(--accent); border:1px solid var(--border); }
+.tag-new { background: var(--violet); color: #fff; opacity: .9; }
+.tag-mono { background: var(--glass-strong); color: var(--fg-1); border:1px solid var(--border); }
+
+/* ===== Card ===== */
+.card { background: var(--bg-1); border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; position: relative; backdrop-filter: blur(8px); }
+.card-head { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--border); background: var(--glass); }
+.card-head h3 { font-size: 14px; font-weight: 600; color: var(--fg-0); }
+.card-head .meta { color: var(--fg-2); font-size: 12px; }
+.card-body { padding: 18px; }
+
+.grid { display: grid; gap: 12px; }
+.grid-2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+.grid-3 { grid-template-columns: repeat(3, minmax(0,1fr)); }
+.grid-4 { grid-template-columns: repeat(4, minmax(0,1fr)); }
+@media (max-width: 1100px){ .grid-3, .grid-4 { grid-template-columns: repeat(2,1fr); } }
+@media (max-width: 700px){ .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; } }
+
+/* ===== HEX editor ===== */
+.hex-input-wrap { position: relative; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--code-bg); transition: border-color .15s, box-shadow .15s; }
+[data-theme="light"] .hex-input-wrap { background: var(--code-bg); }
+.hex-input-wrap:focus-within { border-color: var(--accent); box-shadow: var(--accent-glow); }
+.hex-input {
+  width: 100%; min-height: 100px;
+  background: transparent; color: var(--code-fg);
+  border: none; outline: none; padding: 12px 14px;
+  font-family: var(--font-mono); font-size: 13px; line-height: 1.7;
+  letter-spacing: 0.3px; resize: vertical;
+}
+
+.btn-row { display:flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; font-size: 13px; font-weight: 600; border-radius: 8px; border: 1px solid var(--border); background: var(--glass); color: var(--fg-0); cursor: pointer; transition: all .15s; font-family: inherit; }
+.btn:hover { background: var(--glass-strong); border-color: var(--border-strong); }
+.btn-primary { background: var(--accent); color: #fff; border-color: transparent; box-shadow: var(--accent-glow); }
+.btn-primary:hover { background: var(--accent-dim); }
+.btn-ghost { background: transparent; }
+.btn svg { width:14px; height:14px; }
+
+/* Manual page: protocol spec block + field table */
+.manual-proto {
+  background: var(--bg-2);
+  color: var(--fg-0);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-top: 14px;
+  border: 1px solid var(--border);
+}
+.manual-proto-head {
+  display: flex; align-items: center; gap: 8px;
+  color: var(--info);
+  font-size: 12px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 1px;
+  margin-bottom: 10px;
+}
+.manual-proto-body { display: flex; flex-direction: column; gap: 6px; }
+.manual-proto-row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 12px;
+  align-items: start;
+  font-size: 12px;
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--border);
+}
+.manual-proto-row:last-child { border-bottom: none; }
+.manual-proto-k { color: var(--fg-2); font-weight: 600; }
+.manual-proto-v { color: var(--fg-0); word-break: break-all; }
+.manual-proto-pre {
+  font-family: var(--font-mono);
+  white-space: pre-wrap;
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 0;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: var(--fg-0);
+}
+/* segmented control */
+.seg { display: inline-flex; background: var(--glass); border: 1px solid var(--border); border-radius: 6px; padding: 2px; }
+.seg button { background: transparent; border: none; color: var(--fg-2); font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; cursor: pointer; font-family: var(--font-mono); transition: all .15s; }
+.seg button:hover { color: var(--fg-0); }
+.seg button.active { background: var(--accent); color: #fff; }
+
+/* ===== Parse result ===== */
+.parse-summary { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--accent-soft); border: 1px solid var(--border); border-radius: var(--r-md); margin-bottom: 12px; }
+.parse-summary.warn { background: var(--warn-soft); }
+.parse-summary.danger { background: var(--danger-soft); }
+.parse-summary .ico { width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; background: var(--glass-strong); }
+.parse-summary .ico svg { width: 18px; height: 18px; color: var(--accent); }
+.parse-summary.warn .ico svg { color: var(--warn); }
+.parse-summary.danger .ico svg { color: var(--danger); }
+.parse-summary .lbl { font-size: 11px; color: var(--fg-2); text-transform: uppercase; letter-spacing: 1px; }
+.parse-summary .val { font-weight: 700; font-size: 14px; }
+
+.chan-card { background: var(--bg-1); border: 1px solid var(--border); border-radius: var(--r-md); margin-bottom: 12px; overflow: hidden; }
+.chan-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--bg-2); border-bottom: 1px solid var(--border); font-family: var(--font-mono); font-size: 12px; }
+.chan-head .ch-tag { background: var(--accent-soft); color: var(--accent); font-weight: 700; padding: 2px 8px; border-radius: 4px; font-size: 11px; }
+.chan-head .ch-type { color: var(--fg-1); font-weight: 600; }
+.chan-head .ch-role { color: var(--fg-2); margin-left: auto; font-family: var(--font-ui); }
+.chan-raw { padding: 8px 14px; background: var(--code-bg); font-family: var(--font-mono); font-size: 11px; color: var(--code-fg); border-bottom: 1px solid var(--border); overflow-x: auto; white-space: nowrap; }
+.chan-raw .hdr { color: var(--accent); }
+.chan-raw .addr { color: var(--info); }
+.chan-raw .val { color: var(--code-fg); }
+.chan-raw .wire-note { color: var(--warn); font-family: var(--font-mono); font-size: 11px; }
+
+/* ===== New flat result table (address-band grouped) ===== */
+.result-table { display: flex; flex-direction: column; }
+.band-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-top: 14px;
+  margin-bottom: 0;
+  font-size: 12px;
+}
+.band-head.band-p1   { border-left: 3px solid var(--accent); }
+.band-head.band-host { border-left: 3px solid var(--info); }
+.band-head.band-pack { border-left: 3px solid var(--violet); }
+.band-head.band-control { border-left: 3px solid var(--warn); }
+.band-head.band-control .band-tag { background: var(--warn-soft); color: var(--warn); }
+.band-tag {
+  font-family: var(--font-mono); font-weight: 700; font-size: 11px;
+  padding: 2px 8px; border-radius: 4px;
+  background: var(--accent-soft); color: var(--accent);
+}
+.band-head.band-host .band-tag { background: var(--info-soft); color: var(--info); }
+.band-head.band-pack .band-tag { background: rgba(167,139,250,.15); color: var(--violet); }
+.band-title { font-weight: 600; color: var(--fg-0); }
+.band-desc { color: var(--fg-2); font-size: 11px; flex: 1; }
+.band-count { color: var(--fg-2); font-size: 11px; font-family: var(--font-mono); }
+
+.result-row {
+  display: grid;
+  grid-template-columns: 28% 12% 1fr 22% 8%;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  align-items: center;
+}
+.result-row.result-head {
+  background: var(--glass);
+  color: var(--fg-2);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 10px;
+}
+.result-row .r-name { color: var(--fg-0); font-weight: 500; }
+.result-row .r-addr { font-family: var(--font-mono); color: var(--info); }
+.result-row .r-val  { font-family: var(--font-mono); font-weight: 600; color: var(--accent); }
+.result-row .r-val .unit { color: var(--fg-2); font-size: 11px; font-weight: 400; margin-left: 4px; }
+.result-row .r-raw  { font-family: var(--font-mono); color: var(--fg-2); font-size: 11px; }
+.result-row .r-ch   { font-family: var(--font-mono); color: var(--warn); font-size: 11px; text-align: right; }
+[data-theme="light"] .chan-raw .addr { color: #0284C7; }
+[data-theme="light"] .chan-raw .hdr  { color: #15803D; }
+
+/* ===== Field table ===== */
+.field-table { width: 100%; border-collapse: collapse; }
+.field-table th, .field-table td { padding: 8px 14px; text-align: left; font-size: 12px; border-bottom: 1px solid var(--border); }
+.field-table th { background: var(--glass); color: var(--fg-2); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; font-size: 10px; position: sticky; top: 0; z-index: 1; }
+.field-table tbody tr:hover { background: var(--glass); }
+.field-table .name { color: var(--fg-0); font-weight: 500; }
+.field-table .addr { font-family: var(--font-mono); color: var(--info); font-size: 11px; }
+.field-table .val { font-family: var(--font-mono); font-weight: 600; color: var(--accent); }
+.field-table .unit { color: var(--fg-2); font-size: 11px; margin-left: 4px; font-weight: 400; }
+.field-table .raw { font-family: var(--font-mono); color: var(--fg-2); font-size: 11px; }
+.field-table tr.imp { background: var(--danger-soft); }
+.field-table tr.imp .val { color: var(--danger); }
+
+/* ===== DP overview cards ===== */
+.dp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap: 12px; }
+.dp-card { background: var(--bg-1); border: 1px solid var(--border); border-radius: var(--r-md); padding: 14px; cursor: pointer; transition: all .15s; position: relative; overflow: hidden; }
+.dp-card:hover { transform: translateY(-2px); border-color: var(--accent); box-shadow: var(--accent-glow); }
+.dp-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--accent); opacity: .4; }
+.dp-card.rw::before { background: var(--warn); }
+.dp-card .dp-id { font-family: var(--font-mono); font-weight: 700; color: var(--fg-0); font-size: 18px; }
+.dp-card .dp-name { color: var(--fg-1); font-size: 13px; font-weight: 600; margin-top: 4px; }
+.dp-card .dp-code { color: var(--fg-2); font-size: 11px; font-family: var(--font-mono); margin-top: 2px; }
+.dp-card .dp-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.dp-card .dp-desc { color: var(--fg-2); font-size: 12px; margin-top: 8px; line-height: 1.5; min-height: 36px; }
+.dp-card .dp-stats { display: flex; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); font-size: 11px; color: var(--fg-2); }
+.dp-card .dp-stats strong { color: var(--fg-0); font-family: var(--font-mono); }
+
+/* ===== Tabs ===== */
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; overflow-x: auto; flex-wrap: wrap; scrollbar-width: thin; }
+.tabs::-webkit-scrollbar { height: 4px; }
+.tabs::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 2px; }
+.tab { padding: 8px 14px; background: transparent; border: none; color: var(--fg-2); font-size: 13px; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; font-family: inherit; transition: all .15s; display: inline-flex; align-items: center; gap: 6px; }
+.tab:hover { color: var(--fg-0); }
+.tab.active { color: var(--accent); border-color: var(--accent); }
+.tab .badge { font-family: var(--font-mono); font-size: 10px; padding: 1px 6px; border-radius: 4px; background: var(--glass-strong); color: var(--fg-2); }
+.tab.active .badge { background: var(--accent-soft); color: var(--accent); }
+
+/* ===== Fault codes ===== */
+.fault-section { margin-bottom: 18px; }
+.fault-section h4 { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: var(--fg-1); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px dashed var(--border); }
+.fault-section h4 svg { width: 14px; height: 14px; }
+.fault-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); gap: 8px; }
+.fault-chip { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; background: var(--bg-1); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; transition: all .15s; position: relative; }
+.fault-chip:hover { transform: translateY(-1px); border-color: var(--border-strong); box-shadow: var(--shadow-md); }
+.fault-chip::before { content: ''; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 2px; background: var(--fg-3); }
+.fault-chip.crit::before { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
+.fault-chip.high::before { background: var(--warn); box-shadow: 0 0 6px var(--warn); }
+.fault-chip.med::before { background: var(--amber); }
+.fault-chip.low::before { background: var(--info); }
+.fault-chip .code { font-family: var(--font-mono); font-weight: 700; color: var(--fg-0); font-size: 14px; }
+.fault-chip .name { color: var(--fg-1); font-size: 11px; line-height: 1.3; }
+
+/* ===== Misc ===== */
+.muted { color: var(--fg-2); }
+.mono { font-family: var(--font-mono); }
+.divider { height: 1px; background: var(--border); margin: 16px 0; }
+.row { display:flex; align-items:center; gap: 12px; }
+.row.between { justify-content: space-between; }
+.gap-2 { gap:8px; } .gap-3 { gap:12px; }
+.mt-2 { margin-top:8px; } .mt-3 { margin-top:12px; } .mt-4 { margin-top:16px; }
+
+[data-tip] { position: relative; }
+[data-tip]:hover::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); background: var(--bg-3); color: var(--fg-0); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-family: var(--font-mono); white-space: nowrap; border: 1px solid var(--border-strong); z-index: 100; pointer-events: none; }
+/* Topbar tooltips flip BELOW — there's no headroom above the viewport edge for them. */
+.topbar [data-tip]:hover::after { bottom: auto; top: calc(100% + 6px); }
+
+.empty-state { text-align: center; padding: 48px 16px; color: var(--fg-2); }
+.empty-state svg { width: 48px; height: 48px; opacity: .4; }
+[data-theme="light"] .empty-state svg { color: var(--fg-3); }
+
+/* SVG icon base */
+.icon { width: 16px; height: 16px; flex-shrink: 0; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.icon-sm { width: 12px; height: 12px; }
+.icon-lg { width: 20px; height: 20px; }
+
+/* =========================================================
+   Mobile adaptation — drawer sidebar, compact topbar,
+   stackable result rows, scrollable tables, smaller grids.
+   Breakpoints:
+     ≤1024px : tablet tweaks (denser, smaller padding)
+     ≤768px  : phone (drawer, single-col, stacked tables)
+     ≤480px  : compact phone (further reductions)
+   ========================================================= */
+
+/* Hamburger button — rendered in the topbar, hidden on desktop */
+.menu-btn { display: none; }
+
+/* Backdrop sits over the app when the drawer is open */
+.drawer-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,.45);
+  opacity: 0; pointer-events: none; transition: opacity .2s ease;
+  z-index: 90;
+}
+[data-theme="light"] .drawer-backdrop { background: rgba(15,23,42,.35); }
+.app.drawer-open .drawer-backdrop { opacity: 1; pointer-events: auto; }
+.app.drawer-open { overflow: hidden; height: 100vh; }
+
+/* Lock body scroll while the drawer is open on small screens */
+body.no-scroll { overflow: hidden; }
+
+/* --- Tablet tweaks: shrink the sidebar to a comfortable 200px and trim padding --- */
+@media (max-width: 1024px) {
+  .app { grid-template-columns: 200px 1fr; }
+  .main { padding: 20px; }
+  .topbar { padding: 0 16px; }
+  .dp-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+  .fault-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+}
+
+/* --- Phone: convert sidebar into a left-edge drawer --- */
+@media (max-width: 768px) {
+  .app {
+    grid-template-columns: 1fr !important;
+    grid-template-areas: "topbar" "main";
+  }
+  /* sidebar becomes a fixed drawer; off-canvas by default */
+  .sidebar {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    width: 260px; max-width: 86vw;
+    z-index: 100;
+    transform: translateX(-100%);
+    transition: transform .22s ease;
+    box-shadow: 4px 0 24px rgba(0,0,0,.4);
+    border-right: 1px solid var(--border);
+  }
+  .app.drawer-open .sidebar { transform: translateX(0); }
+
+  /* restore labels (we don't need the icon-rail collapse at this size) */
+  .sidebar .nav-label,
+  .sidebar .brand-text,
+  .sidebar .brand-sub { display: block !important; }
+  .sidebar .brand { justify-content: flex-start !important; padding: 16px 20px !important; }
+  /* Also neutralize the icon-rail collapsed state if it leaked from a desktop localStorage */
+  .app.sidebar-collapsed { grid-template-columns: 1fr !important; }
+  .app.sidebar-collapsed .sidebar { transform: translateX(-100%); }
+
+  /* topbar — hamburger visible, padding tightened */
+  .menu-btn {
+    display: grid; place-items: center;
+    width: 36px; height: 36px;
+    background: var(--glass); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--fg-1); cursor: pointer;
+    margin-right: 4px;
+  }
+  .menu-btn:hover { background: var(--glass-strong); color: var(--fg-0); }
+  .menu-btn svg { width: 18px; height: 18px; }
+
+  .topbar { padding: 0 12px; gap: 6px; min-height: 56px; }
+  .crumb { font-size: 12px; }
+  .crumb .sep { margin: 0 2px; }
+
+  /* hide the long status chip text on phones, keep the dot for visual life */
+  .status-chip { padding: 4px 8px; }
+  .status-chip .label { display: none; }
+
+  .main { padding: 14px 12px 24px; }
+  .page-head { gap: 10px; margin-bottom: 14px; }
+  .page-title { font-size: 18px; }
+  .page-sub { font-size: 12px; }
+  .card { border-radius: var(--r-md); }
+  .card-head { padding: 12px 14px; gap: 8px; }
+  .card-body { padding: 14px; }
+
+  /* single column for any grid on phone */
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  .dp-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+  .fault-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px; }
+  .dp-card { padding: 12px; }
+  .dp-card .dp-id { font-size: 16px; }
+
+  /* protocol spec (manual page) — key/value stack */
+  .manual-proto-row { grid-template-columns: 1fr; gap: 2px; padding: 8px 0; }
+  .manual-proto-k { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
+
+  /* result table — convert 5-col grid into stacked label/value rows */
+  .result-row {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "name name"
+      "addr  val"
+      "raw   ch";
+    gap: 6px 10px;
+    padding: 10px 12px;
+  }
+  .result-row .r-name  { grid-area: name;  font-weight: 600; }
+  .result-row .r-addr  { grid-area: addr;  }
+  .result-row .r-val   { grid-area: val;   text-align: right; }
+  .result-row .r-raw   { grid-area: raw;   }
+  .result-row .r-ch    { grid-area: ch;    text-align: right; }
+  .result-row.result-head { display: none; } /* column headers make no sense when stacked */
+
+  /* band heads wrap on narrow screens */
+  .band-head { flex-wrap: wrap; gap: 6px 10px; padding: 8px 10px; }
+  .band-desc { flex-basis: 100%; }
+
+  /* chan-raw must scroll horizontally; don't let long hex push the layout */
+  .chan-raw { white-space: pre; }
+  .chan-head { flex-wrap: wrap; gap: 6px; }
+  .chan-head .ch-role { margin-left: 0; flex-basis: 100%; }
+
+  /* field tables: wrap in a scroll container, smaller cells */
+  .field-table th, .field-table td { padding: 6px 10px; font-size: 11px; }
+  .field-table .raw, .field-table .addr { font-size: 10px; }
+
+  /* Hide the desktop "collapse to icon rail" button on phones —
+     the drawer already opens/closes via the hamburger / backdrop / Esc,
+     so this control is meaningless (and confusing) on mobile. */
+  .sidebar-toggle { display: none; }
+
+  /* parse summary stays one line but with smaller icon */
+  .parse-summary { padding: 10px 12px; gap: 10px; }
+  .parse-summary .ico { width: 28px; height: 28px; }
+  .parse-summary .ico svg { width: 16px; height: 16px; }
+  .parse-summary .val { font-size: 13px; }
+
+  /* bigger touch targets for nav items in the drawer */
+  .nav-item { padding: 12px 14px; font-size: 14px; }
+  .sidebar-toggle { padding: 12px 14px; font-size: 14px; }
+
+  /* parse buttons — make them comfortable to tap */
+  .btn { padding: 10px 14px; min-height: 40px; }
+  .icon-btn { width: 36px; height: 36px; }
+  .icon-btn-lang { width: 36px; height: 36px; }
+
+  /* hex textarea — keep its comfortable size, but slightly tighter */
+  .hex-input { min-height: 120px; font-size: 12px; padding: 10px 12px; }
+  .btn-row { gap: 6px; }
+}
+
+/* --- Very small phones: extra compaction --- */
+@media (max-width: 480px) {
+  .topbar { padding: 0 10px; }
+  .crumb strong { max-width: 8.5em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .main { padding: 12px 10px 20px; }
+  .page-title { font-size: 17px; }
+  .card-head h3 { font-size: 13px; }
+  .page-tags { gap: 4px; }
+  .tag { font-size: 10px; padding: 2px 6px; }
+  .status-chip { display: none; } /* save space below 480px */
+  .dp-grid { grid-template-columns: 1fr; }
+  .fault-grid { grid-template-columns: repeat(2, 1fr); }
+  .dp-card .dp-id { font-size: 15px; }
+  .result-row { padding: 9px 10px; }
+  .field-table th, .field-table td { padding: 6px 8px; }
+  .row.between { flex-wrap: wrap; gap: 8px; }
+  .row.between > .row { width: 100%; justify-content: space-between; }
+  /* keep the parse/clear buttons on their own row, full-width-ish */
+  #clearBtn, #parseBtn { flex: 1 1 auto; justify-content: center; }
+}
+
+/* Tables that may overflow on any narrow viewport get a horizontal scroll
+   wrapper. We don't need it on desktop where everything fits. */
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.table-scroll .field-table { min-width: 480px; }
+</style>
+</head>
+<body>
+
+<!-- ===== ICON SPRITE ===== -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-logo" viewBox="0 0 24 24">
+      <path fill="#97af48" stroke="none" fill-rule="evenodd" d="M11.2 1.59L12 1.55L12.28 1.73L12.66 1.73L12.75 1.92L12.94 1.92L13.31 2.2L15.42 4.5L15.42 4.59L15.56 4.64L15.61 4.78L16.45 5.63L16.45 5.72L17.11 6.38L17.11 6.47L17.25 6.52L17.3 6.66L18.52 7.88L19.08 8.63L19.22 8.67L19.27 8.81L19.41 8.86L19.45 9L20.77 10.31L20.95 10.78L21.14 10.97L21.14 11.44L21.33 11.72L21.33 12.28L21.14 12.66L21.14 13.03L20.95 13.31L20.95 13.5L19.83 14.72L19.83 14.81L18.89 15.75L18.89 15.84L18 16.73L17.34 16.73L16.08 15.47L16.08 15.38L15.89 15.28L15.89 15.19L15.23 14.53L15.23 14.44L14.11 13.31L14.11 13.22L13.27 12.38L13.27 12.28L12.52 11.53L12.52 11.44L10.73 9.56L10.36 9L10.36 8.25L10.55 7.97L10.55 7.78L11.25 7.27L12 7.27L12.19 7.45L12.47 7.55L12.52 7.69L13.64 8.81L13.64 8.91L14.39 9.66L14.39 9.75L14.58 9.84L14.58 9.94L16.17 11.63L16.36 11.91L16.36 12.19L16.17 12.47L16.17 13.31L16.36 13.59L16.88 14.02L17.44 14.02L17.72 13.83L17.77 13.69L17.91 13.64L17.95 13.5L18.7 12.75L18.89 12.47L18.89 11.72L18.7 11.53L18.7 11.34L17.86 10.5L17.86 10.41L17.2 9.75L17.2 9.66L17.06 9.61L17.02 9.47L15.52 7.97L15.52 7.88L14.86 7.22L14.86 7.13L14.72 7.08L14.67 6.94L13.27 5.53L13.27 5.44L12.52 4.69L12.52 4.59L12.09 4.17L11.91 4.17L11.63 3.98L11.25 4.17L9.61 5.81L9.05 6.56L8.91 6.61L8.86 6.75L7.64 7.97L7.55 8.16L7.55 9L7.73 9.19L7.73 9.38L8.86 10.5L8.86 10.59L9.61 11.34L9.61 11.44L9.8 11.53L9.8 11.63L10.73 12.56L10.73 12.66L10.92 12.75L10.92 12.84L12.7 14.72L12.89 15L12.89 16.03L12.75 16.08L12.19 16.73L12 16.73L11.72 16.92L10.97 16.64L9.05 14.63L9.05 14.53L8.3 13.78L8.3 13.69L8.16 13.64L8.11 13.5L7.17 12.56L6.98 12.28L6.98 11.81L7.17 11.63L7.17 10.78L6.56 10.17L6.38 10.17L6.28 10.08L5.63 10.17L5.2 10.59L5.2 10.69L5.02 10.78L5.02 10.88L4.55 11.34L4.55 11.53L4.36 11.81L4.36 12.19L4.55 12.47L4.55 12.66L11.16 19.83L11.44 20.02L11.91 20.02L12.09 19.83L12.28 19.83L13.17 18.84L13.17 18.75L13.31 18.7L13.36 18.56L14.44 17.48L15.09 17.48L15.28 17.67L15.47 17.67L15.8 18.09L15.8 18.28L15.89 18.38L15.89 18.84L15.7 19.31L14.77 20.25L14.77 20.34L14.58 20.44L14.58 20.53L13.31 21.89L12.75 22.27L12.47 22.27L12.28 22.45L10.97 22.45L10.78 22.27L10.5 22.27L9.94 21.89L9.89 21.75L9.7 21.66L9.7 21.56L8.67 20.53L8.67 20.44L7.92 19.69L7.92 19.59L7.73 19.5L7.73 19.41L6.8 18.47L6.8 18.38L6.05 17.63L6.05 17.53L5.86 17.44L5.86 17.34L5.11 16.59L5.11 16.5L2.58 13.78L2.39 13.5L2.39 13.31L2.11 12.94L2.11 12.56L2.02 12.47L2.02 11.63L2.11 11.53L2.11 11.16L2.48 10.41L2.95 9.94L2.95 9.84L3.14 9.75L3.7 9L5.2 7.5L5.2 7.41L7.17 5.34L7.17 5.25L7.73 4.78L7.73 4.69L9.33 3L9.33 2.91L10.31 1.92L10.5 1.92L10.69 1.73L11.06 1.73ZM17.86 17.91L18.47 17.86L19.27 18.56L19.27 18.94L19.36 19.03L19.27 19.88L18.47 20.58L17.91 20.58L17.53 20.39L17.2 20.06L17.11 19.78L16.92 19.59L16.92 18.84L17.11 18.66L17.2 18.38L17.53 18.05L17.72 18.05Z"/>
+    </symbol>
+    <symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><g><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/><line x1="4.6" y1="4.6" x2="6.7" y2="6.7"/><line x1="17.3" y1="17.3" x2="19.4" y2="19.4"/><line x1="4.6" y1="19.4" x2="6.7" y2="17.3"/><line x1="17.3" y1="6.7" x2="19.4" y2="4.6"/></g></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></symbol>
+    <symbol id="i-flame" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
+    <symbol id="i-bolt" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></symbol>
+    <symbol id="i-cpu" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="2" x2="9" y2="4"/><line x1="15" y1="2" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="22"/><line x1="15" y1="20" x2="15" y2="22"/><line x1="20" y1="9" x2="22" y2="9"/><line x1="20" y1="15" x2="22" y2="15"/><line x1="2" y1="9" x2="4" y2="9"/><line x1="2" y1="15" x2="4" y2="15"/></symbol>
+    <symbol id="i-arr-right" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></symbol>
+    <symbol id="i-tag" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></symbol>
+    <symbol id="i-lang" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></symbol>
+    <symbol id="i-arr-left" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></symbol>
+    <symbol id="i-chevrons-left" viewBox="0 0 24 24"><polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></symbol>
+  </defs>
+</svg>
+
+<div class="app">
+  <!-- Backdrop shown behind the sidebar drawer on phones -->
+  <div class="drawer-backdrop" id="drawerBackdrop" aria-hidden="true"></div>
+
+  <!-- ===== Sidebar ===== -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark"><svg class="icon icon-lg"><use href="#i-logo"/></svg></div>
+      <div class="brand-text">
+        <div class="brand-name">HEKO Solar</div>
+        <div class="brand-sub" data-i18n="brand_sub">Protocol Analyzer · v1.0.8</div>
+      </div>
+    </div>
+
+    <nav class="nav" id="nav">
+      <div class="nav-item active" data-page="parser" role="button" tabindex="0" title="协议解析" aria-label="协议解析">
+        <svg class="icon"><use href="#i-wrench"/></svg>
+        <span class="nav-label" data-i18n="nav_parser">协议解析</span>
+      </div>
+      <div class="nav-item" data-page="overview" role="button" tabindex="0" title="协议概览" aria-label="协议概览">
+        <svg class="icon"><use href="#i-book"/></svg>
+        <span class="nav-label" data-i18n="nav_overview">协议概览</span>
+      </div>
+      <div class="nav-item" data-page="faults" role="button" tabindex="0" title="故障码" aria-label="故障码">
+        <svg class="icon"><use href="#i-alert"/></svg>
+        <span class="nav-label" data-i18n="nav_faults">故障码</span>
+      </div>
+      <div class="nav-item" data-page="changelog" role="button" tabindex="0" title="版本日志" aria-label="版本日志">
+        <svg class="icon"><use href="#i-history"/></svg>
+        <span class="nav-label" data-i18n="nav_changelog">版本日志</span>
+      </div>
+    </nav>
+
+    <!-- collapse / expand toggle (state persisted in localStorage) -->
+    <button type="button" class="sidebar-toggle" id="sidebarToggle" aria-label="收起侧边栏">
+      <svg class="icon"><use href="#i-chevrons-left"/></svg>
+      <span class="nav-label" data-i18n="nav_collapse">收起侧边栏</span>
+    </button>
+  </aside>
+
+  <!-- ===== Topbar ===== -->
+  <header class="topbar">
+    <button type="button" class="menu-btn" id="menuBtn" aria-label="打开菜单" data-tip="打开菜单">
+      <svg class="icon" aria-hidden="true"><use href="#i-menu"/></svg>
+    </button>
+    <div class="crumb">
+      <span>HEKO</span><span class="sep">/</span>
+      <strong id="crumb-section" data-i18n="nav_parser">协议解析</strong>
+    </div>
+    <div class="topbar-spacer"></div>
+    <span class="status-chip"><span class="dot"></span><span class="label">PROTOCOL V1.0.8</span></span>
+    <button class="icon-btn icon-btn-lang" id="langBtn"><span class="lang-label" id="langLabel">中</span></button>
+    <button class="icon-btn" id="themeBtn"><svg class="icon" id="themeIcon"><use href="#i-moon"/></svg></button>
+  </header>
+
+  <!-- ===== Main ===== -->
+  <main class="main" id="main">
+
+    <!-- ============ Parser ============ -->
+    <section data-page-content="parser">
+      <div class="page-head">
+        <div>
+          <div class="page-title" data-i18n="parser_title">协议解析</div>
+          <div class="page-sub" data-i18n="parser_sub">地址驱动 · 自动识别 DP 类型 · 通道区分设备</div>
+          <div class="page-tags">
+            <span class="tag tag-r" data-i18n="tag_raw">RAW 透传</span>
+            <span class="tag tag-dp">03 01</span>
+            <span class="tag tag-mono" data-i18n="tag_block">6 字节/块</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-head">
+          <svg class="icon" style="color:var(--info)"><use href="#i-cpu"/></svg>
+          <h3 data-i18n="hex_title">HEX 报文输入</h3>
+          <span class="meta" data-i18n="hex_meta">完整报文,含 03 01 头</span>
+        </div>
+        <div class="card-body">
+          <div class="hex-input-wrap">
+            <textarea id="hexInput" class="hex-input" spellcheck="false"
+              placeholder="03 01 01 01 00 01 4B 32 01 01 00 02 30 30 01 01 00 03 32 36 ..."></textarea>
+          </div>
+          <div class="row between mt-3" style="gap:12px">
+            <div class="row gap-2" style="align-items:center">
+              <span class="muted" style="font-size:12px; font-family:var(--font-mono)" id="hexStats">0 B · 0 字段</span>
+            </div>
+            <div class="row gap-2">
+              <button class="btn" id="clearBtn"><svg class="icon"><use href="#i-trash"/></svg><span data-i18n="btn_clear">清空</span></button>
+              <button class="btn btn-primary" id="parseBtn"><svg class="icon"><use href="#i-play"/></svg><span data-i18n="btn_parse">解析</span></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <svg class="icon" style="color:var(--accent)"><use href="#i-check"/></svg>
+          <h3 data-i18n="result_title">解析结果</h3>
+          <span class="meta" id="parseMeta" data-i18n="result_wait">等待输入…</span>
+        </div>
+        <div class="card-body" id="parseResult">
+          <div class="empty-state">
+            <svg class="icon"><use href="#i-wrench"/></svg>
+            <div class="mt-2" data-i18n="result_empty">粘贴或加载一段 HEX 报文,点击「解析」</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ Overview ============ -->
+    <section data-page-content="overview" hidden>
+      <div class="page-head">
+        <div>
+          <div class="page-title" data-i18n="ov_title">协议概览</div>
+          <div class="page-sub" data-i18n="ov_sub">HEKO 阳台光伏物模型 · 12 个 DP 全部一览</div>
+          <div class="page-tags">
+            <span class="tag tag-mono">V1.0.8</span>
+            <span class="tag tag-new" data-i18n="tag_new">含 DP113-117</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="dp-section">
+        <h4 class="nav-section" style="padding:0; margin: 0 0 10px"><svg class="icon icon-sm"><use href="#i-cpu"/></svg><span data-i18n="ov_readonly">设备数据 (R)</span></h4>
+        <div class="dp-grid" id="dpGridR"></div>
+      </div>
+
+      <div class="dp-section" style="margin-top:24px">
+        <h4 class="nav-section" style="padding:0; margin: 0 0 10px"><svg class="icon icon-sm"><use href="#i-bolt"/></svg><span data-i18n="ov_rw">控制与设置 (RW)</span></h4>
+        <div class="dp-grid" id="dpGridRW"></div>
+      </div>
+
+      <div class="dp-section" style="margin-top:24px">
+        <h4 class="nav-section" style="padding:0; margin: 0 0 10px"><svg class="icon icon-sm"><use href="#i-tag"/></svg><span data-i18n="ov_stats">统计 (R,5min)</span></h4>
+        <div class="dp-grid" id="dpGridStat"></div>
+      </div>
+    </section>
+
+    <!-- ============ Protocol Detail (entered from Overview cards) ============ -->
+    <section data-page-content="manual" hidden>
+      <div class="page-head">
+        <div>
+          <div class="page-title" data-i18n="man_title">协议详情</div>
+          <div class="page-sub" data-i18n="man_sub">完整寄存器定义与解码</div>
+        </div>
+        <button class="btn" id="manualBackBtn" style="margin-left:auto"><svg class="icon"><use href="#i-arr-left"/></svg><span data-i18n="man_back">返回概览</span></button>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <svg class="icon" style="color:var(--info)"><use href="#i-cpu"/></svg>
+          <h3 id="manualTitle">DP3</h3>
+          <span class="meta" id="manualMeta"></span>
+        </div>
+        <div class="card-body" id="manualBody"></div>
+      </div>
+    </section>
+
+    <!-- ============ Faults ============ -->
+    <section data-page-content="faults" hidden>
+      <div class="page-head">
+        <div>
+          <div class="page-title" data-i18n="fault_title">故障码一览</div>
+          <div class="page-sub" data-i18n="fault_sub">DP5 告警与保护码 · 点击复制</div>
+          <div class="page-tags">
+            <span class="tag tag-r">R</span>
+            <span class="tag tag-dp">3 类</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="fault-section">
+        <h4><svg class="icon"><use href="#i-cpu"/></svg><span data-i18n="fault_p1">P1 告警码 (地址 0201)</span></h4>
+        <div class="fault-grid" id="faultP1"></div>
+      </div>
+
+      <div class="fault-section">
+        <h4><svg class="icon" style="color:var(--warn)"><use href="#i-alert"/></svg><span data-i18n="fault_group">堆告警码 group_alarm (地址 1201)</span></h4>
+        <div class="fault-grid" id="faultGroupAlarm"></div>
+      </div>
+
+      <div class="fault-section">
+        <h4><svg class="icon" style="color:var(--danger)"><use href="#i-shield"/></svg><span data-i18n="fault_protect">堆保护码 group_protection (地址 1202)</span></h4>
+        <div class="fault-grid" id="faultGroupProtect"></div>
+      </div>
+    </section>
+
+    <!-- ============ Changelog ============ -->
+    <section data-page-content="changelog" hidden>
+      <div class="page-head">
+        <div>
+          <div class="page-title" data-i18n="cl_title">协议更新日志</div>
+          <div class="page-sub" data-i18n="cl_sub">HEKO 阳台光伏物模型 V1.0.0 → V1.1.0</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-body" style="padding:0">
+          <div class="table-scroll">
+            <table class="field-table">
+              <thead><tr><th data-i18n="th_version">版本</th><th data-i18n="th_date">时间</th><th data-i18n="th_changes">变更</th><th data-i18n="th_author">作者</th></tr></thead>
+              <tbody id="changelogBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+/* =========================================================
+   i18n (中英) — full dictionary
+   ========================================================= */
+const I18N = {
+  zh: {
+    brand_sub: '阳台光伏协议解析器',
+    nav_parser: '协议解析', nav_overview: '协议概览', nav_faults: '故障码', nav_changelog: '版本日志', nav_collapse: '收起侧边栏',
+    nav_menu: '打开菜单', nav_close: '关闭菜单',
+    man_back: '返回概览',
+    parser_title: '协议解析', parser_sub: '地址驱动 · 自动识别 DP 类型 · 通道区分设备',
+    tag_raw: 'RAW 透传', tag_block: '6 字节/块', tag_new: '含 DP113-117',
+    btn_clear: '清空', btn_parse: '解析',
+    hex_title: 'HEX 报文输入', hex_meta: '完整报文,含 03 01 头',
+    sample_dp3: 'DP3 设备', sample_dp4: 'DP4 动态', sample_dp5: 'DP5 告警', sample_dp7: 'DP7 控制', sample_dp113: 'DP113 电池包',
+    result_title: '解析结果', result_wait: '等待输入…', result_empty: '粘贴或加载一段 HEX 报文,点击「解析」',
+    parse_err_empty: '请输入十六进制数据', parse_err_header: '需 03 01 头', parse_err_hex: 'hex 无效', parse_err_short: '数据过短',
+    parse_ok: '识别为', parse_unknown: '未识别 / 混合报文', parse_header_err: '报文头错误',
+    parse_bytes: '字节', parse_channels: '通道', parse_fields: '字段',
+    chan_unknown: '通道', chan_p1: 'P1 网关', chan_host: 'GROUP{n} 主机', chan_pack: 'GROUP{n} 包{m}',
+    th_addr: '地址', th_code: '标识符', th_name: '名称', th_len: '长度', th_unit: '单位/说明',
+    th_version: '版本', th_date: '时间', th_changes: '变更', th_author: '作者',
+    ov_title: '协议概览', ov_sub: 'HEKO 阳台光伏物模型 · 12 个 DP 全部一览',
+    ov_readonly: '设备数据 (R)', ov_rw: '控制与设置 (RW)', ov_stats: '统计 (R,5min)',
+    dp3: {name:'设备信息', code:'device_info', freq:'上电/配网', fields:7, desc:'P1 SN、固件、GROUP 主机 SN、Pack 数等。'},
+    dp4: {name:'动态数据', code:'stack_instant', freq:'1 分钟', fields:11, desc:'能量、电网功率、L1-L3、电池/电网/光伏功率。'},
+    dp5: {name:'告警', code:'alarm_message', freq:'1 分钟', fields:3, desc:'P1 告警码、堆告警码、堆保护码。'},
+    dp6: {name:'心跳', code:'model_data', freq:'5 秒', fields:7, desc:'三相瞬时功率、SOC、电池/电网/光伏功率。'},
+    dp7: {name:'功能设置', code:'function_set', freq:'读写', fields:19, desc:'电价、工作模式、应急、ECO、AC 插座、添加/删除流程。'},
+    dp111: {name:'计划模式', code:'plan_mode_set', freq:'读写', fields:75, desc:'5 张时间表,每表 5 个任务(类型+起+止)。'},
+    dp112: {name:'面板心跳', code:'panel_heartbeat_data', freq:'查询', fields:11, desc:'间隔 0601 + 高频功率返回(查询-响应)。'},
+    dp113: {name:'堆1电池数据', code:'stack1_pack_instant', freq:'1 分钟', fields:9, desc:'堆1的5个电池包 SOC/SOH/温度/电压/循环。'},
+    dp114: {name:'堆2电池数据', code:'stack2_pack_instant', freq:'1 分钟', fields:9, desc:'堆2的5个电池包数据。'},
+    dp115: {name:'堆3电池数据', code:'stack3_pack_instant', freq:'1 分钟', fields:9, desc:'堆3的5个电池包数据。'},
+    dp116: {name:'堆4电池数据', code:'stack4_pack_instant', freq:'1 分钟', fields:9, desc:'堆4的5个电池包数据。'},
+    dp117: {name:'堆5电池数据', code:'stack5_pack_instant', freq:'1 分钟', fields:9, desc:'堆5的5个电池包数据。'},
+    dp101: {name:'当日累计充电', code:'day_charge_energy', freq:'5 分钟', fields:1, desc:'家庭当日 PV+AC 总充电 kWh。'},
+    dp102: {name:'当年累计充电', code:'year_charge_energy', freq:'5 分钟', fields:1, desc:'家庭当年总充电 kWh。'},
+    dp103: {name:'当日累计放电', code:'day_discharge_energy', freq:'5 分钟', fields:1, desc:'家庭当日总放电 kWh。'},
+    dp104: {name:'当年累计放电', code:'year_discharge_energy', freq:'5 分钟', fields:1, desc:'家庭当年总放电 kWh。'},
+    dp105: {name:'当日光伏发电', code:'day_pv_generation', freq:'5 分钟', fields:1, desc:'当日光伏总发电量。'},
+    dp106: {name:'当年光伏发电', code:'year_pv_generation', freq:'5 分钟', fields:1, desc:'当年光伏总发电量。'},
+    dp107: {name:'当日电网用电', code:'day_grid_consumption', freq:'5 分钟', fields:1, desc:'当日电网口总用电量。'},
+    dp108: {name:'当年电网用电', code:'year_grid_consumption', freq:'5 分钟', fields:1, desc:'当年电网口总用电量。'},
+    dp109: {name:'当日电网馈入', code:'day_grid_generation', freq:'5 分钟', fields:1, desc:'当日电池→电网总电量。'},
+    dp110: {name:'当年电网馈入', code:'year_grid_generation', freq:'5 分钟', fields:1, desc:'当年电池→电网总电量。'},
+    man_title: '协议详情', man_sub: '完整寄存器定义与解码',
+    fault_title: '故障码一览', fault_sub: 'DP5 告警与保护码 · 点击复制',
+    fault_p1: 'P1 告警码 (地址 0201)', fault_group: '堆告警码 group_alarm (地址 1201)', fault_protect: '堆保护码 group_protection (地址 1202)',
+    fc_p1_1: 'P1 与电表通信异常',
+    fc_ga: {1:'欠压保护',6:'AC 过载保护',7:'过功率一级',8:'过功率二级',9:'过功率三级',10:'过功率四级',11:'BMS 通信异常',12:'PCS 通信异常',21:'PV 充电过功率'},
+    fc_gp: {2:'BMS 欠压保护',3:'BMS 放电温度',4:'BMS 充电温度',5:'BMS MOS 温度',6:'BMS 预放电保护',7:'BMS 充电过流',8:'BMS 放电过流',9:'BMS 短路保护',10:'BMS 压差故障',11:'BMS 低压故障',62:'PCS 过温',63:'PCS 电压异常',64:'PCS 频率异常',65:'PCS 输出电压',66:'PCS 输出短路',67:'PCS 输出过载',68:'PCS 内部故障',69:'PCS 光伏过压',70:'PCS 光伏过流'},
+    cl_title: '协议更新日志', cl_sub: 'HEKO 阳台光伏物模型 V1.0.0 → V1.0.8',
+  },
+  en: {
+    brand_sub: 'Protocol Analyzer',
+    nav_parser: 'Parser', nav_overview: 'Overview', nav_faults: 'Faults', nav_changelog: 'Changelog', nav_collapse: 'Collapse sidebar',
+    nav_menu: 'Open menu', nav_close: 'Close menu',
+    man_back: 'Back to overview',
+    parser_title: 'Protocol Parser', parser_sub: 'Address-driven · Auto-detect DP type · Channel distinguishes device',
+    tag_raw: 'RAW passthrough', tag_block: '6 B/block', tag_new: 'incl. DP113-117',
+    btn_clear: 'Clear', btn_parse: 'Parse',
+    hex_title: 'HEX Input', hex_meta: 'Full frame, must start with 03 01',
+    sample_dp3: 'DP3 Device', sample_dp4: 'DP4 Dynamic', sample_dp5: 'DP5 Alarm', sample_dp7: 'DP7 Control', sample_dp113: 'DP113 Pack',
+    result_title: 'Parse Result', result_wait: 'Waiting…', result_empty: 'Paste or load a HEX frame, then click Parse',
+    parse_err_empty: 'Please enter HEX data', parse_err_header: 'Must start with 03 01', parse_err_hex: 'Invalid hex', parse_err_short: 'Data too short',
+    parse_ok: 'Identified as', parse_unknown: 'Unrecognized / mixed', parse_header_err: 'Header error',
+    parse_bytes: 'bytes', parse_channels: 'channels', parse_fields: 'fields',
+    chan_unknown: 'ch', chan_p1: 'P1 gateway', chan_host: 'GROUP{n} host', chan_pack: 'GROUP{n} pack{m}',
+    th_addr: 'Addr', th_code: 'Identifier', th_name: 'Name', th_len: 'Len', th_unit: 'Unit/Note',
+    th_version: 'Version', th_date: 'Date', th_changes: 'Changes', th_author: 'Author',
+    ov_title: 'Protocol Overview', ov_sub: 'HEKO balcony PV object model · all 12 DPs at a glance',
+    ov_readonly: 'Device data (R)', ov_rw: 'Control & settings (RW)', ov_stats: 'Statistics (R, 5min)',
+    dp3:  {name:'Device info', code:'device_info', freq:'on boot/pair', fields:7, desc:'P1 SN, firmware, GROUP host SN, pack count.'},
+    dp4:  {name:'Dynamic data', code:'stack_instant', freq:'1 min', fields:11, desc:'Energy, grid power, L1-L3, battery/grid/PV power.'},
+    dp5:  {name:'Alarms', code:'alarm_message', freq:'1 min', fields:3, desc:'P1 alarm, group alarm, group protection codes.'},
+    dp6:  {name:'Heartbeat', code:'model_data', freq:'5 s', fields:7, desc:'Three-phase instantaneous power, SOC, battery/grid/PV.'},
+    dp7:  {name:'Function set', code:'function_set', freq:'RW', fields:19, desc:'Tariff, work mode, emergency, ECO, AC socket, add/del flow.'},
+    dp111:{name:'Plan mode', code:'plan_mode_set', freq:'RW', fields:75, desc:'5 schedules × 5 tasks (type + start + end).'},
+    dp112:{name:'Panel heartbeat', code:'panel_heartbeat_data', freq:'query', fields:11, desc:'Interval 0601 + high-freq power (query-response).'},
+    dp113:{name:'Stack 1 pack data', code:'stack1_pack_instant', freq:'1 min', fields:9, desc:'5 packs SOC/SOH/temp/voltage/cycle.'},
+    dp114:{name:'Stack 2 pack data', code:'stack2_pack_instant', freq:'1 min', fields:9, desc:'5 packs data for stack 2.'},
+    dp115:{name:'Stack 3 pack data', code:'stack3_pack_instant', freq:'1 min', fields:9, desc:'5 packs data for stack 3.'},
+    dp116:{name:'Stack 4 pack data', code:'stack4_pack_instant', freq:'1 min', fields:9, desc:'5 packs data for stack 4.'},
+    dp117:{name:'Stack 5 pack data', code:'stack5_pack_instant', freq:'1 min', fields:9, desc:'5 packs data for stack 5.'},
+    dp101:{name:'Day charge', code:'day_charge_energy', freq:'5 min', fields:1, desc:'Home day PV+AC charge, kWh.'},
+    dp102:{name:'Year charge', code:'year_charge_energy', freq:'5 min', fields:1, desc:'Home year charge, kWh.'},
+    dp103:{name:'Day discharge', code:'day_discharge_energy', freq:'5 min', fields:1, desc:'Home day discharge, kWh.'},
+    dp104:{name:'Year discharge', code:'year_discharge_energy', freq:'5 min', fields:1, desc:'Home year discharge, kWh.'},
+    dp105:{name:'Day PV gen', code:'day_pv_generation', freq:'5 min', fields:1, desc:'Day PV generation, kWh.'},
+    dp106:{name:'Year PV gen', code:'year_pv_generation', freq:'5 min', fields:1, desc:'Year PV generation, kWh.'},
+    dp107:{name:'Day grid use', code:'day_grid_consumption', freq:'5 min', fields:1, desc:'Day grid port consumption, kWh.'},
+    dp108:{name:'Year grid use', code:'year_grid_consumption', freq:'5 min', fields:1, desc:'Year grid port consumption, kWh.'},
+    dp109:{name:'Day grid feed', code:'day_grid_generation', freq:'5 min', fields:1, desc:'Day battery→grid total.'},
+    dp110:{name:'Year grid feed', code:'year_grid_generation', freq:'5 min', fields:1, desc:'Year battery→grid total.'},
+    man_title: 'Protocol Detail', man_sub: 'Full register definitions & decoding',
+    fault_title: 'Fault Codes', fault_sub: 'DP5 alarms & protections · click to copy',
+    fault_p1: 'P1 alarm (addr 0201)', fault_group: 'Group alarm (addr 1201)', fault_protect: 'Group protection (addr 1202)',
+    fc_p1_1: 'P1-meter comm error',
+    fc_ga: {1:'Under-voltage',6:'AC overload',7:'Over-power L1',8:'Over-power L2',9:'Over-power L3',10:'Over-power L4',11:'BMS comm error',12:'PCS comm error',21:'PV over-charge power'},
+    fc_gp: {2:'BMS under-voltage',3:'BMS discharge temp',4:'BMS charge temp',5:'BMS MOS temp',6:'BMS pre-discharge',7:'BMS charge over-current',8:'BMS discharge over-current',9:'BMS short circuit',10:'BMS voltage diff',11:'BMS low voltage',62:'PCS overheat',63:'PCS voltage',64:'PCS frequency',65:'PCS output voltage',66:'PCS output short',67:'PCS output overload',68:'PCS internal',69:'PCS PV overvoltage',70:'PCS PV overcurrent'},
+    cl_title: 'Changelog', cl_sub: 'HEKO balcony PV model V1.0.0 → V1.0.8',
+  }
+};
+
+/* =========================================================
+   Field definitions (single source of truth)
+   ========================================================= */
+const FIELD_DEFS = [
+  // P1
+  {addr:0x0001, len:16, code:'P1_SN',  unit:''},
+  {addr:0x0009, len:2,  code:'P1_FW',  unit:''},
+  {addr:0x0101, len:4,  code:'Energy_Delivered', unit:'Wh'},
+  {addr:0x0103, len:4,  code:'Energy_Received',   unit:'Wh'},
+  {addr:0x0105, len:2,  code:'Grid_Power_P', unit:'W'},
+  {addr:0x0106, len:2,  code:'Grid_Power_N', unit:'W'},
+  {addr:0x0107, len:2,  code:'L1_P', unit:'W'},
+  {addr:0x0108, len:2,  code:'L2_P', unit:'W'},
+  {addr:0x0109, len:2,  code:'L3_P', unit:'W'},
+  {addr:0x010A, len:2,  code:'L1_N', unit:'W'},
+  {addr:0x010B, len:2,  code:'L2_N', unit:'W'},
+  {addr:0x010C, len:2,  code:'L3_N', unit:'W'},
+  {addr:0x010D, len:2,  code:'WiFi', unit:''},
+  {addr:0x010E, len:2,  code:'BLE',  unit:''},
+  {addr:0x010F, len:2,  code:'Sys_SOC',     unit:'%'},
+  {addr:0x0110, len:2,  code:'Sys_Cap',     unit:'0.1kWh'},
+  {addr:0x0111, len:2,  code:'Sys_Remain',  unit:'0.1kWh'},
+  {addr:0x0112, len:2,  code:'Sys_Battery_Power', unit:'W'},
+  {addr:0x0113, len:2,  code:'Sys_Grid_Power',    unit:'W'},
+  {addr:0x0114, len:2,  code:'Sys_PV_Power',      unit:'W'},
+  {addr:0x0115, len:2,  code:'Grid_Freq',         unit:'Hz'},
+  {addr:0x0201, len:2,  code:'P1_Alarm',          unit:''},
+  // DP7 control
+  {addr:0x0301, len:2,  code:'Price1',            unit:'0.001 元'},
+  {addr:0x0302, len:2,  code:'Price2',            unit:'0.001 元'},
+  {addr:0x0303, len:2,  code:'WorkMode',          unit:''},
+  {addr:0x0304, len:2,  code:'ManualMode',        unit:''},
+  {addr:0x0305, len:2,  code:'EmergencySwitch',   unit:''},
+  {addr:0x0306, len:2,  code:'EmergencySOC',      unit:'%'},
+  {addr:0x0307, len:2,  code:'ECOMode',           unit:''},
+  {addr:0x0308, len:2,  code:'GridMaxPower',      unit:'bitmask'},
+  {addr:0x0309, len:2,  code:'AC_Socket_Group1',  unit:''},
+  {addr:0x030A, len:2,  code:'AC_Socket_Group2',  unit:''},
+  {addr:0x030B, len:2,  code:'AC_Socket_Group3',  unit:''},
+  {addr:0x030C, len:2,  code:'AC_Socket_Group4',  unit:''},
+  {addr:0x030D, len:2,  code:'AC_Socket_Group5',  unit:''},
+  {addr:0x0401, len:2,  code:'APP_Add',           unit:''},
+  {addr:0x0402, len:2,  code:'APP_Del',           unit:'bitmask'},
+  {addr:0x0403, len:2,  code:'APP_Confirm',       unit:''},
+  {addr:0x0404, len:2,  code:'APP_Cancel',        unit:''},
+  {addr:0x0405, len:16, code:'P1_Scan_SN',        unit:''},
+  {addr:0x040D, len:2,  code:'P1_Feedback',       unit:''},
+  // DP112
+  {addr:0x0601, len:2,  code:'Interval',          unit:'s'},
+  // DP111 schedule
+  {addr:0x0501, len:2,  code:'Sched_Active',      unit:'bitmask'},
+  {addr:0x0502, len:2,  code:'Sched1_TaskState',  unit:'bitmask'},
+  {addr:0x0503, len:2,  code:'Sched1_Task1_Type', unit:''},
+  {addr:0x0504, len:2,  code:'Sched1_Task1_Start',unit:''},
+  {addr:0x0505, len:2,  code:'Sched1_Task1_End',  unit:''},
+  {addr:0x0506, len:2,  code:'Sched1_Task2_Type', unit:''},
+  {addr:0x0507, len:2,  code:'Sched1_Task2_Start',unit:''},
+  {addr:0x0508, len:2,  code:'Sched1_Task2_End',  unit:''},
+  {addr:0x0509, len:2,  code:'Sched1_Task3_Type', unit:''},
+  {addr:0x050A, len:2,  code:'Sched1_Task3_Start',unit:''},
+  {addr:0x050B, len:2,  code:'Sched1_Task3_End',  unit:''},
+  {addr:0x050C, len:2,  code:'Sched1_Task4_Type', unit:''},
+  {addr:0x050D, len:2,  code:'Sched1_Task4_Start',unit:''},
+  {addr:0x050E, len:2,  code:'Sched1_Task4_End',  unit:''},
+  {addr:0x050F, len:2,  code:'Sched1_Task5_Type', unit:''},
+  {addr:0x0510, len:2,  code:'Sched1_Task5_Start',unit:''},
+  {addr:0x0511, len:2,  code:'Sched1_Task5_End',  unit:''},
+  {addr:0x0512, len:2,  code:'Sched2_TaskState',  unit:'bitmask'},
+  {addr:0x0513, len:2,  code:'Sched2_Task1_Type', unit:''},
+  {addr:0x0514, len:2,  code:'Sched2_Task1_Start',unit:''},
+  {addr:0x0515, len:2,  code:'Sched2_Task1_End',  unit:''},
+  {addr:0x0516, len:2,  code:'Sched2_Task2_Type', unit:''},
+  {addr:0x0517, len:2,  code:'Sched2_Task2_Start',unit:''},
+  {addr:0x0518, len:2,  code:'Sched2_Task2_End',  unit:''},
+  {addr:0x0519, len:2,  code:'Sched2_Task3_Type', unit:''},
+  {addr:0x051A, len:2,  code:'Sched2_Task3_Start',unit:''},
+  {addr:0x051B, len:2,  code:'Sched2_Task3_End',  unit:''},
+  {addr:0x051C, len:2,  code:'Sched2_Task4_Type', unit:''},
+  {addr:0x051D, len:2,  code:'Sched2_Task4_Start',unit:''},
+  {addr:0x051E, len:2,  code:'Sched2_Task4_End',  unit:''},
+  {addr:0x051F, len:2,  code:'Sched2_Task5_Type', unit:''},
+  {addr:0x0520, len:2,  code:'Sched2_Task5_Start',unit:''},
+  {addr:0x0521, len:2,  code:'Sched2_Task5_End',  unit:''},
+  {addr:0x0522, len:2,  code:'Sched3_TaskState',  unit:'bitmask'},
+  {addr:0x0523, len:2,  code:'Sched3_Task1_Type', unit:''},
+  {addr:0x0524, len:2,  code:'Sched3_Task1_Start',unit:''},
+  {addr:0x0525, len:2,  code:'Sched3_Task1_End',  unit:''},
+  {addr:0x0526, len:2,  code:'Sched3_Task2_Type', unit:''},
+  {addr:0x0527, len:2,  code:'Sched3_Task2_Start',unit:''},
+  {addr:0x0528, len:2,  code:'Sched3_Task2_End',  unit:''},
+  {addr:0x0529, len:2,  code:'Sched3_Task3_Type', unit:''},
+  {addr:0x052A, len:2,  code:'Sched3_Task3_Start',unit:''},
+  {addr:0x052B, len:2,  code:'Sched3_Task3_End',  unit:''},
+  {addr:0x052C, len:2,  code:'Sched3_Task4_Type', unit:''},
+  {addr:0x052D, len:2,  code:'Sched3_Task4_Start',unit:''},
+  {addr:0x052E, len:2,  code:'Sched3_Task4_End',  unit:''},
+  {addr:0x052F, len:2,  code:'Sched3_Task5_Type', unit:''},
+  {addr:0x0530, len:2,  code:'Sched3_Task5_Start',unit:''},
+  {addr:0x0531, len:2,  code:'Sched3_Task5_End',  unit:''},
+  {addr:0x0532, len:2,  code:'Sched4_TaskState',  unit:'bitmask'},
+  {addr:0x0533, len:2,  code:'Sched4_Task1_Type', unit:''},
+  {addr:0x0534, len:2,  code:'Sched4_Task1_Start',unit:''},
+  {addr:0x0535, len:2,  code:'Sched4_Task1_End',  unit:''},
+  {addr:0x0536, len:2,  code:'Sched4_Task2_Type', unit:''},
+  {addr:0x0537, len:2,  code:'Sched4_Task2_Start',unit:''},
+  {addr:0x0538, len:2,  code:'Sched4_Task2_End',  unit:''},
+  {addr:0x0539, len:2,  code:'Sched4_Task3_Type', unit:''},
+  {addr:0x053A, len:2,  code:'Sched4_Task3_Start',unit:''},
+  {addr:0x053B, len:2,  code:'Sched4_Task3_End',  unit:''},
+  {addr:0x053C, len:2,  code:'Sched4_Task4_Type', unit:''},
+  {addr:0x053D, len:2,  code:'Sched4_Task4_Start',unit:''},
+  {addr:0x053E, len:2,  code:'Sched4_Task4_End',  unit:''},
+  {addr:0x053F, len:2,  code:'Sched4_Task5_Type', unit:''},
+  {addr:0x0540, len:2,  code:'Sched4_Task5_Start',unit:''},
+  {addr:0x0541, len:2,  code:'Sched4_Task5_End',  unit:''},
+  {addr:0x0542, len:2,  code:'Sched5_TaskState',  unit:'bitmask'},
+  {addr:0x0543, len:2,  code:'Sched5_Task1_Type', unit:''},
+  {addr:0x0544, len:2,  code:'Sched5_Task1_Start',unit:''},
+  {addr:0x0545, len:2,  code:'Sched5_Task1_End',  unit:''},
+  {addr:0x0546, len:2,  code:'Sched5_Task2_Type', unit:''},
+  {addr:0x0547, len:2,  code:'Sched5_Task2_Start',unit:''},
+  {addr:0x0548, len:2,  code:'Sched5_Task2_End',  unit:''},
+  {addr:0x0549, len:2,  code:'Sched5_Task3_Type', unit:''},
+  {addr:0x054A, len:2,  code:'Sched5_Task3_Start',unit:''},
+  {addr:0x054B, len:2,  code:'Sched5_Task3_End',  unit:''},
+  {addr:0x054C, len:2,  code:'Sched5_Task4_Type', unit:''},
+  {addr:0x054D, len:2,  code:'Sched5_Task4_Start',unit:''},
+  {addr:0x054E, len:2,  code:'Sched5_Task4_End',  unit:''},
+  {addr:0x054F, len:2,  code:'Sched5_Task5_Type', unit:''},
+  {addr:0x0550, len:2,  code:'Sched5_Task5_Start',unit:''},
+  {addr:0x0551, len:2,  code:'Sched5_Task5_End',  unit:''},
+  // host
+  {addr:0x1001, len:16, code:'HOST_SN',  unit:''},
+  {addr:0x1009, len:2,  code:'HOST_FW',  unit:''},
+  {addr:0x100A, len:2,  code:'PCS_FW',   unit:''},
+  {addr:0x100B, len:2,  code:'MPPT_FW',  unit:''},
+  {addr:0x100C, len:2,  code:'HOST_PACK_COUNT', unit:'个'},
+  {addr:0x1101, len:2,  code:'STACK_SOC',  unit:'%'},
+  {addr:0x1102, len:2,  code:'STACK_CAP',  unit:'Ah'},
+  {addr:0x1103, len:2,  code:'STACK_PV',   unit:'W'},
+  {addr:0x1104, len:2,  code:'STACK_OFFGRID', unit:'W'},
+  {addr:0x1105, len:2,  code:'STACK_GRID_DISCHARGE', unit:'W'},
+  {addr:0x1106, len:2,  code:'STACK_GRID_CHARGE',    unit:'W'},
+  {addr:0x1107, len:2,  code:'AC_SOCKET', unit:''},
+  {addr:0x1108, len:2,  code:'BOOST_MODE',unit:''},
+  {addr:0x1201, len:2,  code:'STACK_ALARM', unit:''},
+  {addr:0x1202, len:2,  code:'STACK_PROTECT', unit:''},
+  // pack
+  {addr:0x2001, len:16, code:'PACK_SN',  unit:''},
+  {addr:0x2009, len:2,  code:'PACK_FW',  unit:''},
+  {addr:0x2101, len:2,  code:'PACK_SOC', unit:'%'},
+  {addr:0x2102, len:2,  code:'PACK_SOH', unit:'%'},
+  {addr:0x2103, len:2,  code:'PACK_TEMP_MAX', unit:'℃'},
+  {addr:0x2104, len:2,  code:'PACK_TEMP_MIN', unit:'℃'},
+  {addr:0x2105, len:2,  code:'PACK_VOLT_MAX', unit:'mV'},
+  {addr:0x2106, len:2,  code:'PACK_VOLT_MIN', unit:'mV'},
+  {addr:0x2107, len:2,  code:'PACK_CYCLE',    unit:''},
+];
+
+/* field code → {zh, en} */
+const FIELD_LABEL = {
+  P1_SN:{zh:'P1 SN 序列号',en:'P1 SN serial'},
+  P1_FW:{zh:'P1 固件版本',en:'P1 firmware'},
+  Energy_Delivered:{zh:'向用户输送电力',en:'Energy delivered to client'},
+  Energy_Received:{zh:'用户输送电力',en:'Energy received from client'},
+  Grid_Power_P:{zh:'电网功率 +P',en:'Grid power +P'},
+  Grid_Power_N:{zh:'电网功率 -P',en:'Grid power -P'},
+  L1_P:{zh:'L1 有功 +P',en:'L1 active +P'},
+  L2_P:{zh:'L2 有功 +P',en:'L2 active +P'},
+  L3_P:{zh:'L3 有功 +P',en:'L3 active +P'},
+  L1_N:{zh:'L1 有功 -P',en:'L1 active -P'},
+  L2_N:{zh:'L2 有功 -P',en:'L2 active -P'},
+  L3_N:{zh:'L3 有功 -P',en:'L3 active -P'},
+  WiFi:{zh:'WiFi 状态',en:'WiFi state'},
+  BLE:{zh:'蓝牙状态',en:'BLE state'},
+  Sys_SOC:{zh:'系统 SOC',en:'System SOC'},
+  Sys_Cap:{zh:'系统满电容量',en:'System full capacity'},
+  Sys_Remain:{zh:'系统剩余容量',en:'System remaining'},
+  Sys_Battery_Power:{zh:'系统电池功率',en:'System battery power'},
+  Sys_Grid_Power:{zh:'系统电网功率',en:'System grid power'},
+  Sys_PV_Power:{zh:'系统光伏功率',en:'System PV power'},
+  Grid_Freq:{zh:'电网频率',en:'Grid frequency'},
+  P1_Alarm:{zh:'P1 告警码',en:'P1 alarm'},
+  Price1:{zh:'电费单价1',en:'Electricity price 1'},
+  Price2:{zh:'电费单价2',en:'Electricity price 2'},
+  WorkMode:{zh:'工作模式',en:'Work mode'},
+  ManualMode:{zh:'手动模式状态',en:'Manual mode state'},
+  EmergencySwitch:{zh:'应急电源开关',en:'Emergency power switch'},
+  EmergencySOC:{zh:'应急电源 SOC',en:'Emergency SOC'},
+  ECOMode:{zh:'ECO 模式',en:'ECO mode'},
+  GridMaxPower:{zh:'并网最大功率',en:'Max grid power'},
+  AC_Socket_Group1:{zh:'G1 AC 插座',en:'G1 AC socket'},
+  AC_Socket_Group2:{zh:'G2 AC 插座',en:'G2 AC socket'},
+  AC_Socket_Group3:{zh:'G3 AC 插座',en:'G3 AC socket'},
+  AC_Socket_Group4:{zh:'G4 AC 插座',en:'G4 AC socket'},
+  AC_Socket_Group5:{zh:'G5 AC 插座',en:'G5 AC socket'},
+  APP_Add:{zh:'APP 添加',en:'APP add'},
+  APP_Del:{zh:'APP 删除',en:'APP delete'},
+  APP_Confirm:{zh:'APP 确认',en:'APP confirm'},
+  APP_Cancel:{zh:'APP 取消',en:'APP cancel'},
+  P1_Scan_SN:{zh:'P1 扫描新堆 SN',en:'P1 scanned SN'},
+  P1_Feedback:{zh:'P1 操作反馈',en:'P1 op feedback'},
+  Interval:{zh:'获取时间间隔',en:'Fetch interval'},
+  Sched_Active:{zh:'时间表开启',en:'Schedule active'},
+  Sched1_TaskState:{zh:'表1 任务开启',en:'Sched 1 task state'},
+  Sched1_Task1_Type:{zh:'表1 任务1 类型',en:'Sched 1 task 1 type'},
+  Sched1_Task1_Start:{zh:'表1 任务1 起始',en:'Sched 1 task 1 start'},
+  Sched1_Task1_End:{zh:'表1 任务1 结束',en:'Sched 1 task 1 end'},
+  Sched1_Task2_Type:{zh:'表1 任务2 类型',en:'Sched 1 task 2 type'},
+  Sched1_Task2_Start:{zh:'表1 任务2 起始',en:'Sched 1 task 2 start'},
+  Sched1_Task2_End:{zh:'表1 任务2 结束',en:'Sched 1 task 2 end'},
+  Sched1_Task3_Type:{zh:'表1 任务3 类型',en:'Sched 1 task 3 type'},
+  Sched1_Task3_Start:{zh:'表1 任务3 起始',en:'Sched 1 task 3 start'},
+  Sched1_Task3_End:{zh:'表1 任务3 结束',en:'Sched 1 task 3 end'},
+  Sched1_Task4_Type:{zh:'表1 任务4 类型',en:'Sched 1 task 4 type'},
+  Sched1_Task4_Start:{zh:'表1 任务4 起始',en:'Sched 1 task 4 start'},
+  Sched1_Task4_End:{zh:'表1 任务4 结束',en:'Sched 1 task 4 end'},
+  Sched1_Task5_Type:{zh:'表1 任务5 类型',en:'Sched 1 task 5 type'},
+  Sched1_Task5_Start:{zh:'表1 任务5 起始',en:'Sched 1 task 5 start'},
+  Sched1_Task5_End:{zh:'表1 任务5 结束',en:'Sched 1 task 5 end'},
+  Sched2_TaskState:{zh:'表2 任务开启',en:'Sched 2 task state'},
+  Sched2_Task1_Type:{zh:'表2 任务1 类型',en:'Sched 2 task 1 type'},
+  Sched2_Task1_Start:{zh:'表2 任务1 起始',en:'Sched 2 task 1 start'},
+  Sched2_Task1_End:{zh:'表2 任务1 结束',en:'Sched 2 task 1 end'},
+  Sched2_Task2_Type:{zh:'表2 任务2 类型',en:'Sched 2 task 2 type'},
+  Sched2_Task2_Start:{zh:'表2 任务2 起始',en:'Sched 2 task 2 start'},
+  Sched2_Task2_End:{zh:'表2 任务2 结束',en:'Sched 2 task 2 end'},
+  Sched2_Task3_Type:{zh:'表2 任务3 类型',en:'Sched 2 task 3 type'},
+  Sched2_Task3_Start:{zh:'表2 任务3 起始',en:'Sched 2 task 3 start'},
+  Sched2_Task3_End:{zh:'表2 任务3 结束',en:'Sched 2 task 3 end'},
+  Sched2_Task4_Type:{zh:'表2 任务4 类型',en:'Sched 2 task 4 type'},
+  Sched2_Task4_Start:{zh:'表2 任务4 起始',en:'Sched 2 task 4 start'},
+  Sched2_Task4_End:{zh:'表2 任务4 结束',en:'Sched 2 task 4 end'},
+  Sched2_Task5_Type:{zh:'表2 任务5 类型',en:'Sched 2 task 5 type'},
+  Sched2_Task5_Start:{zh:'表2 任务5 起始',en:'Sched 2 task 5 start'},
+  Sched2_Task5_End:{zh:'表2 任务5 结束',en:'Sched 2 task 5 end'},
+  Sched3_TaskState:{zh:'表3 任务开启',en:'Sched 3 task state'},
+  Sched3_Task1_Type:{zh:'表3 任务1 类型',en:'Sched 3 task 1 type'},
+  Sched3_Task1_Start:{zh:'表3 任务1 起始',en:'Sched 3 task 1 start'},
+  Sched3_Task1_End:{zh:'表3 任务1 结束',en:'Sched 3 task 1 end'},
+  Sched3_Task2_Type:{zh:'表3 任务2 类型',en:'Sched 3 task 2 type'},
+  Sched3_Task2_Start:{zh:'表3 任务2 起始',en:'Sched 3 task 2 start'},
+  Sched3_Task2_End:{zh:'表3 任务2 结束',en:'Sched 3 task 2 end'},
+  Sched3_Task3_Type:{zh:'表3 任务3 类型',en:'Sched 3 task 3 type'},
+  Sched3_Task3_Start:{zh:'表3 任务3 起始',en:'Sched 3 task 3 start'},
+  Sched3_Task3_End:{zh:'表3 任务3 结束',en:'Sched 3 task 3 end'},
+  Sched3_Task4_Type:{zh:'表3 任务4 类型',en:'Sched 3 task 4 type'},
+  Sched3_Task4_Start:{zh:'表3 任务4 起始',en:'Sched 3 task 4 start'},
+  Sched3_Task4_End:{zh:'表3 任务4 结束',en:'Sched 3 task 4 end'},
+  Sched3_Task5_Type:{zh:'表3 任务5 类型',en:'Sched 3 task 5 type'},
+  Sched3_Task5_Start:{zh:'表3 任务5 起始',en:'Sched 3 task 5 start'},
+  Sched3_Task5_End:{zh:'表3 任务5 结束',en:'Sched 3 task 5 end'},
+  Sched4_TaskState:{zh:'表4 任务开启',en:'Sched 4 task state'},
+  Sched4_Task1_Type:{zh:'表4 任务1 类型',en:'Sched 4 task 1 type'},
+  Sched4_Task1_Start:{zh:'表4 任务1 起始',en:'Sched 4 task 1 start'},
+  Sched4_Task1_End:{zh:'表4 任务1 结束',en:'Sched 4 task 1 end'},
+  Sched4_Task2_Type:{zh:'表4 任务2 类型',en:'Sched 4 task 2 type'},
+  Sched4_Task2_Start:{zh:'表4 任务2 起始',en:'Sched 4 task 2 start'},
+  Sched4_Task2_End:{zh:'表4 任务2 结束',en:'Sched 4 task 2 end'},
+  Sched4_Task3_Type:{zh:'表4 任务3 类型',en:'Sched 4 task 3 type'},
+  Sched4_Task3_Start:{zh:'表4 任务3 起始',en:'Sched 4 task 3 start'},
+  Sched4_Task3_End:{zh:'表4 任务3 结束',en:'Sched 4 task 3 end'},
+  Sched4_Task4_Type:{zh:'表4 任务4 类型',en:'Sched 4 task 4 type'},
+  Sched4_Task4_Start:{zh:'表4 任务4 起始',en:'Sched 4 task 4 start'},
+  Sched4_Task4_End:{zh:'表4 任务4 结束',en:'Sched 4 task 4 end'},
+  Sched4_Task5_Type:{zh:'表4 任务5 类型',en:'Sched 4 task 5 type'},
+  Sched4_Task5_Start:{zh:'表4 任务5 起始',en:'Sched 4 task 5 start'},
+  Sched4_Task5_End:{zh:'表4 任务5 结束',en:'Sched 4 task 5 end'},
+  Sched5_TaskState:{zh:'表5 任务开启',en:'Sched 5 task state'},
+  Sched5_Task1_Type:{zh:'表5 任务1 类型',en:'Sched 5 task 1 type'},
+  Sched5_Task1_Start:{zh:'表5 任务1 起始',en:'Sched 5 task 1 start'},
+  Sched5_Task1_End:{zh:'表5 任务1 结束',en:'Sched 5 task 1 end'},
+  Sched5_Task2_Type:{zh:'表5 任务2 类型',en:'Sched 5 task 2 type'},
+  Sched5_Task2_Start:{zh:'表5 任务2 起始',en:'Sched 5 task 2 start'},
+  Sched5_Task2_End:{zh:'表5 任务2 结束',en:'Sched 5 task 2 end'},
+  Sched5_Task3_Type:{zh:'表5 任务3 类型',en:'Sched 5 task 3 type'},
+  Sched5_Task3_Start:{zh:'表5 任务3 起始',en:'Sched 5 task 3 start'},
+  Sched5_Task3_End:{zh:'表5 任务3 结束',en:'Sched 5 task 3 end'},
+  Sched5_Task4_Type:{zh:'表5 任务4 类型',en:'Sched 5 task 4 type'},
+  Sched5_Task4_Start:{zh:'表5 任务4 起始',en:'Sched 5 task 4 start'},
+  Sched5_Task4_End:{zh:'表5 任务4 结束',en:'Sched 5 task 4 end'},
+  Sched5_Task5_Type:{zh:'表5 任务5 类型',en:'Sched 5 task 5 type'},
+  Sched5_Task5_Start:{zh:'表5 任务5 起始',en:'Sched 5 task 5 start'},
+  Sched5_Task5_End:{zh:'表5 任务5 结束',en:'Sched 5 task 5 end'},
+  HOST_SN:{zh:'主机 SN',en:'Host SN'},
+  HOST_FW:{zh:'主机固件',en:'Host firmware'},
+  PCS_FW:{zh:'PCS 固件',en:'PCS firmware'},
+  MPPT_FW:{zh:'MPPT 固件',en:'MPPT firmware'},
+  HOST_PACK_COUNT:{zh:'Pack 数量',en:'Pack count'},
+  STACK_SOC:{zh:'堆 SOC',en:'Stack SOC'},
+  STACK_CAP:{zh:'堆容量',en:'Stack capacity'},
+  STACK_PV:{zh:'堆 PV 功率',en:'Stack PV power'},
+  STACK_OFFGRID:{zh:'堆离网放电',en:'Stack off-grid discharge'},
+  STACK_GRID_DISCHARGE:{zh:'堆并网放电',en:'Stack grid discharge'},
+  STACK_GRID_CHARGE:{zh:'堆市电充电',en:'Stack grid charge'},
+  AC_SOCKET:{zh:'AC 插座',en:'AC socket'},
+  BOOST_MODE:{zh:'增压模式',en:'Boost mode'},
+  STACK_ALARM:{zh:'堆告警码',en:'Stack alarm'},
+  STACK_PROTECT:{zh:'堆保护码',en:'Stack protection'},
+  PACK_SN:{zh:'SN',en:'SN'},
+  PACK_FW:{zh:'固件',en:'Firmware'},
+  PACK_SOC:{zh:'SOC',en:'SOC'},
+  PACK_SOH:{zh:'SOH',en:'SOH'},
+  PACK_TEMP_MAX:{zh:'电芯最高温度',en:'Cell max temp'},
+  PACK_TEMP_MIN:{zh:'电芯最低温度',en:'Cell min temp'},
+  PACK_VOLT_MAX:{zh:'单体最高电压',en:'Cell max voltage'},
+  PACK_VOLT_MIN:{zh:'单体最低电压',en:'Cell min voltage'},
+  PACK_CYCLE:{zh:'循环次数',en:'Cycle count'},
+};
+
+/* =========================================================
+   State
+   ========================================================= */
+let currentLang = localStorage.getItem('heko.lang') || 'zh';
+let currentTheme = localStorage.getItem('heko.theme') || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+let currentPage = 'parser';
+let currentManualDP = 3;
+let currentBlockSize = +localStorage.getItem('heko.block') || 6;  // 6 or 8 bytes per block
+let blockSizeLocked = false;  // true if user/URL explicitly chose, false = auto-detect next time
+let parseRendered = false;    // true while a parse result is on screen; lang switch re-renders it
+
+document.documentElement.setAttribute('data-theme', currentTheme);
+document.documentElement.setAttribute('lang', currentLang === 'zh' ? 'zh-CN' : 'en');
+
+/* URL params (page / theme / lang / block / manualDP) — used for previews and direct links */
+(function applyURLParams(){
+  const p = new URLSearchParams(location.search);
+  if (p.get('theme')) { currentTheme = p.get('theme'); localStorage.setItem('heko.theme', currentTheme); }
+  if (p.get('lang'))  { currentLang  = p.get('lang');  localStorage.setItem('heko.lang',  currentLang); }
+  if (p.get('block') && (p.get('block') === '6' || p.get('block') === '8')) {
+    currentBlockSize = +p.get('block');
+    localStorage.setItem('heko.block', currentBlockSize);
+    blockSizeLocked = true;
+  }
+  if (p.get('manualDP')) {
+    const n = +p.get('manualDP');
+    if (n >= 3 && n <= 117) currentManualDP = n;
+  }
+})();
+
+/* =========================================================
+   i18n + theme apply
+   ========================================================= */
+function t(key) {
+  const d = I18N[currentLang] || I18N.zh;
+  return d[key] !== undefined ? d[key] : (I18N.zh[key] || key);
+}
+function fieldLabel(code) {
+  const m = FIELD_LABEL[code];
+  if (!m) return code;
+  return currentLang === 'en' ? m.en : m.zh;
+}
+
+function applyTheme() {
+  document.documentElement.setAttribute('data-theme', currentTheme);
+  document.getElementById('themeIcon').innerHTML = `<use href="#i-${currentTheme==='dark'?'sun':'moon'}"/>`;
+}
+function applyLang() {
+  // nav + nav-tag texts via data-i18n
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const k = el.getAttribute('data-i18n');
+    if (I18N[currentLang] && I18N[currentLang][k] !== undefined) el.textContent = I18N[currentLang][k];
+  });
+  // nav accessibility labels follow the translated text
+  document.querySelectorAll('#nav .nav-item').forEach(n => {
+    const label = n.querySelector('.nav-label');
+    const text = label ? label.textContent.trim() : '';
+    if (text) { n.setAttribute('aria-label', text); n.setAttribute('title', text); }
+  });
+  const sbToggle = document.getElementById('sidebarToggle');
+  if (sbToggle) { sbToggle.setAttribute('aria-label', t('nav_collapse')); sbToggle.title = t('nav_collapse'); }
+  const menuBtn = document.getElementById('menuBtn');
+  if (menuBtn) { menuBtn.setAttribute('aria-label', t('nav_menu')); menuBtn.setAttribute('data-tip', t('nav_menu')); }
+  syncLangLabel();
+  // re-render content that depends on language
+  renderOverview();
+  renderManual();
+  renderFaults();
+  renderChangelog();
+  // update crumb
+  const crumbSec = document.getElementById('crumb-section');
+  if (currentPage === 'parser') crumbSec.textContent = t('nav_parser');
+  else if (currentPage === 'overview') crumbSec.textContent = t('nav_overview');
+  else if (currentPage === 'manual') crumbSec.textContent = t('man_title');
+  else if (currentPage === 'faults') crumbSec.textContent = t('nav_faults');
+  else if (currentPage === 'changelog') crumbSec.textContent = t('nav_changelog');
+  // update stat labels
+  if (hexInput && hexInput.value) updateStats();
+  // keep an already-displayed parse result in sync with the new language
+  if (parseRendered) runParse();
+}
+
+/* =========================================================
+   Navigation
+   ========================================================= */
+const PAGE_LABELS = {
+  parser:    'nav_parser',
+  overview:  'nav_overview',
+  manual:    'man_title',
+  faults:    'nav_faults',
+  changelog: 'nav_changelog',
+};
+document.getElementById('nav').addEventListener('click', e => {
+  const item = e.target.closest('.nav-item');
+  if (!item) return;
+  showPage(item.dataset.page);
+});
+document.getElementById('nav').addEventListener('keydown', e => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const item = e.target.closest('.nav-item');
+  if (!item) return;
+  e.preventDefault();
+  showPage(item.dataset.page);
+});
+/* Protocol Detail is reached only from Overview cards — back button returns there */
+document.getElementById('manualBackBtn').onclick = () => showPage('overview');
+
+/* Sidebar collapse/expand — icon rail with state persisted in localStorage */
+function applySidebar() {
+  const collapsed = localStorage.getItem('heko.sidebar') === 'collapsed';
+  document.querySelector('.app').classList.toggle('sidebar-collapsed', collapsed);
+}
+document.getElementById('sidebarToggle').onclick = () => {
+  // The icon-rail collapse is a desktop-only feature; on mobile the sidebar
+  // is a drawer and this button is hidden via CSS. Bail out defensively.
+  if (isMobile()) { closeDrawer(); return; }
+  const collapsed = localStorage.getItem('heko.sidebar') === 'collapsed';
+  localStorage.setItem('heko.sidebar', collapsed ? 'expanded' : 'collapsed');
+  applySidebar();
+};
+applySidebar();
+
+/* =========================================================
+   Mobile drawer (≤768px)
+   - Hamburger button toggles the drawer
+   - Backdrop click, Esc, or nav-item click closes it
+   - Body scroll is locked while open
+   - Reopens clean on resize into/out of mobile widths
+   ========================================================= */
+const MOBILE_QUERY = window.matchMedia('(max-width: 768px)');
+const _app         = document.querySelector('.app');
+const _menuBtn     = document.getElementById('menuBtn');
+const _backdrop    = document.getElementById('drawerBackdrop');
+const _drawerState = { open: false };
+
+function isMobile() { return MOBILE_QUERY.matches; }
+function openDrawer() {
+  if (!isMobile()) return;
+  _app.classList.add('drawer-open');
+  document.body.classList.add('no-scroll');
+  _drawerState.open = true;
+  _menuBtn?.setAttribute('aria-expanded', 'true');
+}
+function closeDrawer() {
+  _app.classList.remove('drawer-open');
+  document.body.classList.remove('no-scroll');
+  _drawerState.open = false;
+  _menuBtn?.setAttribute('aria-expanded', 'false');
+}
+function toggleDrawer() { _drawerState.open ? closeDrawer() : openDrawer(); }
+
+if (_menuBtn) _menuBtn.addEventListener('click', toggleDrawer);
+if (_backdrop) _backdrop.addEventListener('click', closeDrawer);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+
+/* When the user picks a page from the drawer, close it on mobile */
+document.getElementById('nav').addEventListener('click', e => {
+  if (e.target.closest('.nav-item') && isMobile()) closeDrawer();
+});
+
+/* If the viewport crosses the breakpoint while the drawer is open, reset it
+   so we don't end up with a frozen body-scroll on desktop. */
+MOBILE_QUERY.addEventListener('change', e => {
+  if (!e.matches) closeDrawer();
+});
+
+function showPage(page) {
+  currentPage = page;
+  document.querySelectorAll('.nav-item').forEach(n => {
+    const on = n.dataset.page === page;
+    n.classList.toggle('active', on);
+    if (on) n.setAttribute('aria-current', 'page');
+    else n.removeAttribute('aria-current');
+  });
+  document.querySelectorAll('[data-page-content]').forEach(s => s.hidden = s.dataset.pageContent !== page);
+  document.getElementById('crumb-section').textContent = t(PAGE_LABELS[page] || 'nav_parser');
+  document.getElementById('main').scrollTop = 0;
+  if (page === 'manual') renderManual();
+}
+
+/* =========================================================
+   Theme + Lang buttons
+   ========================================================= */
+document.getElementById('themeBtn').onclick = () => {
+  currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('heko.theme', currentTheme);
+  applyTheme();
+};
+/* Topbar icon button — same toggle, but reflected in the small lang-label badge */
+document.getElementById('langBtn').onclick = () => {
+  currentLang = currentLang === 'zh' ? 'en' : 'zh';
+  localStorage.setItem('heko.lang', currentLang);
+  document.documentElement.setAttribute('lang', currentLang === 'zh' ? 'zh-CN' : 'en');
+  applyLang();
+};
+function syncLangLabel() {
+  const el = document.getElementById('langLabel');
+  if (el) el.textContent = currentLang === 'zh' ? '中' : 'EN';
+}
+
+/* =========================================================
+   HEX parsing
+   ========================================================= */
+const SAMPLES = {
+  dp3:  '03 01 01 01 00 01 4B 32 01 01 00 02 30 30 01 01 00 03 32 36 01 01 00 04 45 39 01 01 00 05 30 30 01 01 00 06 30 30 01 01 00 07 31 41 01 01 00 08 45 00 01 01 00 09 00 CE',
+  dp4:  '03 01 01 01 01 01 00 00 00 64 01 01 01 03 00 00 00 32 01 01 01 05 00 26 01 01 01 0F 00 57 01 01 01 10 00 34 01 01 01 12 FF D6 01 01 01 14 09 24',
+  dp5:  '03 01 01 01 02 01 00 01 01 01 00 02 00 01 01 01 00 0B 00 01 01 01 00 0C 00 01',
+  dp7:  '03 01 01 01 03 01 03 E8 01 01 03 02 01 F4 01 01 03 03 00 01 01 01 03 04 00 01 01 01 03 05 00 01 01 01 03 06 00 14 01 01 03 07 00 01 01 01 03 09 00 01',
+  /* DP113 (ch=0x0B = decimal 11 = group1 pack1): 8×SN + FW + 7×other, all as 6-byte blocks */
+  dp113:'03 01' +
+        '0B 01 20 01 50 41' + '0B 01 20 02 43 4B' + '0B 01 20 03 30 31' + '0B 01 20 04 32 33' +
+        '0B 01 20 05 34 35' + '0B 01 20 06 36 37' + '0B 01 20 07 38 00' + '0B 01 20 08 00 00' +
+        '0B 01 20 09 01 02' +
+        '0B 01 21 01 00 5A' + '0B 01 21 02 00 62' + '0B 01 21 03 00 1E' + '0B 01 21 04 00 19' +
+        '0B 01 21 05 09 C4' + '0B 01 21 06 09 A0' + '0B 01 21 07 00 C8',
+};
+
+const hexInput = document.getElementById('hexInput');
+const hexStats = document.getElementById('hexStats');
+const parseResult = document.getElementById('parseResult');
+const parseMeta = document.getElementById('parseMeta');
+
+function normalizeHex(s) {
+  return (s || '').replace(/\s+/g, '').replace(/[^0-9a-fA-F]/g, '').toUpperCase();
+}
+function bytesOf(s) {
+  const c = normalizeHex(s);
+  if (c.length % 2) return null;
+  const arr = [];
+  for (let i = 0; i < c.length; i += 2) {
+    const n = parseInt(c.substr(i, 2), 16);
+    if (isNaN(n)) return null;
+    arr.push(n);
+  }
+  return arr;
+}
+function getChanInfo(ch) {
+  if (ch === 0x01) return { type: 'p1', group: 0, pack: 0 };
+  const g = Math.floor(ch / 0x0a);
+  const p = ch % 0x0a;
+  if (g >= 1 && g <= 5 && p === 0) return { type: 'host', group: g, pack: 0 };
+  if (g >= 1 && g <= 5 && p >= 1 && p <= 5) return { type: 'pack', group: g, pack: p };
+  return { type: 'unknown', group: 0, pack: 0 };
+}
+function chanLabel(ch) {
+  const info = getChanInfo(ch);
+  if (info.type === 'p1') return t('chan_p1');
+  if (info.type === 'host') return t('chan_host').replace('{n}', info.group);
+  if (info.type === 'pack') return t('chan_pack').replace('{n}', info.group).replace('{m}', info.pack);
+  return t('chan_unknown') + ' 0x' + ch.toString(16);
+}
+
+function isPackAddr(a) { return (a >= 0x2001 && a <= 0x2008) || a === 0x2009 || (a >= 0x2101 && a <= 0x2107); }
+
+/* Map a wire channel byte to its GROUP index (1-5). 0 = not a host channel.
+   Host channels are 0x0a (G1), 0x14 (G2), 0x1e (G3), 0x28 (G4), 0x32 (G5).
+   Pack channels (0x0b-0x0f, 0x15-0x19, ...) are *not* hosts even though they share
+   the 0x0a-multiple range — distinguish by the low nibble. */
+function groupIndex(wireCh) {
+  if (wireCh < 0x0a) return 0;
+  const high = Math.floor(wireCh / 0x0a);
+  const low  = wireCh % 0x0a;
+  if (low !== 0) return 0;          // pack channel, not a host
+  if (high < 1 || high > 5) return 0;
+  return high;
+}
+
+/* Protocol-spec rank — encodes the *order* fields appear in the spec sheet for each DP.
+   This is NOT address-sorted; the DP3 spec for example interleaves P1, GROUP×5, then P1
+   measurements in a specific human-readable order that the parser must reproduce. */
+function protocolRank(addr, wireCh) {
+  const g = groupIndex(wireCh);
+  const gSlot = g ? (g - 1) * 10 : 0;   // groups 1..5 map to slots 0,10,20,30,40
+  if (addr === 0x0001) return 100;                 // P1 SN (start of spec)
+  if (addr === 0x0009) return 110;                 // P1 FW
+  if (addr === 0x0201) return 120;                 // P1 alarm (DP5)
+  if (g >= 1 && addr >= 0x1001 && addr <= 0x1008) return 200 + gSlot;  // GROUP SN
+  if (g >= 1 && addr === 0x1009)                  return 250 + gSlot;  // GROUP FW
+  if (g >= 1 && addr === 0x100A)                  return 300 + gSlot;  // GROUP PCS FW
+  if (g >= 1 && addr === 0x100B)                  return 350 + gSlot;  // GROUP MPPT FW
+  if (g >= 1 && addr === 0x100C)                  return 400 + gSlot;  // GROUP Pack count
+  if (g >= 1 && addr === 0x1201)                  return 450 + gSlot;  // GROUP alarm
+  if (g >= 1 && addr === 0x1202)                  return 500 + gSlot;  // GROUP protect
+  if (addr === 0x0101 || addr === 0x0103)         return 600 + (addr - 0x0101);  // energy
+  if (addr >= 0x0105 && addr <= 0x010C)           return 610 + (addr - 0x0105);  // grid + L1-L3
+  if (addr === 0x010D)                            return 618;                  // WiFi state
+  if (addr === 0x010E)                            return 619;                  // BLE state
+  if (addr >= 0x010F && addr <= 0x0114)           return 620 + (addr - 0x010F);  // SOC, cap, power
+  if (addr === 0x0115)                            return 626;                  // grid freq (end of P1 in DP4)
+  if (addr === 0x0601)                            return 700;  // DP112 interval
+  if (addr === 0x0501)                            return 710;  // DP111 schedule
+  if (addr >= 0x1001 && addr <= 0x1008)           return 720 + addr;  // P1 SN overflow (in case wireCh unknown)
+  if (addr === 0x1009)                            return 750;
+  if (addr === 0x100A)                            return 751;
+  if (addr === 0x100B)                            return 752;
+  if (addr === 0x100C)                            return 753;
+  // DP7 control fields
+  if (addr >= 0x0301 && addr <= 0x030D)           return 800 + (addr - 0x0301);
+  if (addr >= 0x0401 && addr <= 0x040D)           return 820 + (addr - 0x0401);
+  // PACK fields (DP113-117) — each pack has 9 fields (SN + FW + 7 metrics), so
+  // step by 10 to leave headroom and prevent overlap between adjacent packs.
+  if (addr >= 0x2001 && addr <= 0x2008)           return 900 + (wireCh - 0x0a) * 10 + 0;
+  if (addr === 0x2009)                            return 900 + (wireCh - 0x0a) * 10 + 1;
+  if (addr >= 0x2101 && addr <= 0x2107)           return 900 + (wireCh - 0x0a) * 10 + 2 + (addr - 0x2101);
+  // Fallback
+  return 10000 + addr;
+}
+
+/* Auto-detect block size: try 6-byte and 8-byte, count recognized addresses + valid channels */
+function detectBlockSize(bytes) {
+  function score(blockSize) {
+    let s = 0;
+    for (let i = 2; i + blockSize - 1 < bytes.length; i += blockSize) {
+      const ch = bytes[i];
+      const cmd = bytes[i + 1];
+      const addr = (bytes[i + 2] << 8) | bytes[i + 3];
+      if (FIELD_DEFS.some(f => f.addr === addr)) s += 2;
+      if (getChanInfo(ch).type !== 'unknown') s += 1;
+      if (cmd === 0x01) s += 0.5;
+    }
+    return s;
+  }
+  const s6 = score(6), s8 = score(8);
+  return s8 > s6 ? 8 : 6;
+}
+
+function detectDP(channelMap) {
+  const allAddrs = new Set();
+  let hasPack = false;
+  for (const [, m] of channelMap) for (const a of m.keys()) { allAddrs.add(a); if (isPackAddr(a)) hasPack = true; }
+  if (hasPack) {
+    for (const [ch, m] of channelMap) {
+      const info = getChanInfo(ch);
+      if (info.type === 'pack') { const dp = 112 + info.group; if (dp >= 113 && dp <= 117) return dp; }
+    }
+    return 113;
+  }
+  /* Override #1: if any DP7 control register is present, this is a DP7 frame.
+     The 0x0301–0x030D and 0x0401–0x040D range is unique to DP7 and never appears
+     in pure measurement (DP6), schedule (DP111) or alarm (DP5) frames, so this is
+     safe and takes precedence over the SIG scoring below. */
+  for (const a of allAddrs) {
+    if ((a >= 0x0301 && a <= 0x030D) || (a >= 0x0401 && a <= 0x040D)) return 7;
+  }
+  const SIG = {
+    3:  [0x0001, 0x0009, 0x1001],
+    4:  [0x0101, 0x010F, 0x0110],
+    5:  [0x0201, 0x1201, 0x1202],
+    6:  [0x0107, 0x010F, 0x0112],
+    7:  [0x0303, 0x0309, 0x030D, 0x040D],  /* scoring fallback, only used if no control addr is hit */
+    111:[0x0501, 0x0502, 0x0503],
+    112:[0x0601],
+  };
+  let best = { dp: 0, score: 0 };
+  for (const [dp, arr] of Object.entries(SIG)) {
+    let hit = 0;
+    for (const a of arr) if (allAddrs.has(a)) hit++;
+    const score = hit / arr.length;
+    if (score > best.score && score > 0) best = { dp: +dp, score };
+  }
+  return best.dp || 4;
+}
+
+function u16(b) { return (b[0] << 8) | b[1]; }
+function u16s(b) { let v = u16(b); return v > 32767 ? v - 65536 : v; }
+function u32(b) { return (b[0] << 24) | (b[1] << 16) | (b[2] << 8) | b[3]; }
+function ascii(b) { try { return new TextDecoder('ascii').decode(b).replace(/\0+$/, ''); } catch { return ''; } }
+
+/* SN is "missing" if any byte is 0xFF (flash-empty marker), or if the trimmed
+   payload has no printable ASCII content. Catches both the all-zero case and
+   the observed 15×0xFF + 0x42 device-flash-empty case. */
+function isMissingSN(b) {
+  let hasPrintable = false;
+  for (const x of b) {
+    if (x === 0xFF) return true;                            // any 0xFF = flash-empty
+    if (x !== 0x00 && (x < 0x20 || x > 0x7E)) return true;  // non-printable (besides NUL)
+    if (x >= 0x20 && x <= 0x7E) hasPrintable = true;
+  }
+  return !hasPrintable;
+}
+
+function parseValue(def, b) {
+  const code = def.code;
+  // custom decoders
+  if (code === 'P1_FW') return 'V' + u16(b);
+  if (code === 'HOST_FW' || code === 'PACK_FW') {
+    const d = [(b[0] >> 4) & 0xF, b[0] & 0xF, (b[1] >> 4) & 0xF, b[1] & 0xF];
+    const s = d.join('').replace(/^0+/, '');
+    return 'V' + (s || '0');
+  }
+  if (code === 'WorkMode')   return ({1: currentLang==='en'?'Solar self-use':'太阳能自发自用', 2: currentLang==='en'?'Scheduled':'定时调度', 3: currentLang==='en'?'Manual':'手动模式'})[u16(b)] || u16(b);
+  if (code === 'ManualMode') return ({0: currentLang==='en'?'Idle':'空闲', 1: currentLang==='en'?'Charge':'充电', 2: currentLang==='en'?'Discharge':'放电'})[u16(b)] || u16(b);
+  if (['EmergencySwitch','ECOMode','APP_Add','APP_Confirm','APP_Cancel','BOOST_MODE'].includes(code)) return u16(b) === 1 ? (currentLang==='en'?'ON':'开') : (currentLang==='en'?'OFF':'关');
+  if (['WiFi','BLE'].includes(code)) return u16(b) === 1 ? (currentLang==='en'?'Connected':'已连接') : (currentLang==='en'?'Disconnected':'未连接');
+  if (['AC_SOCKET'].includes(code)) return u16(b) === 1 ? (currentLang==='en'?'ON':'开') : (currentLang==='en'?'OFF':'关');
+  if (code === 'GridMaxPower') {
+    const v = u16(b);
+    const s = [];
+    for (let i = 0; i < 5; i++) if (v & (1 << i)) s.push('G' + (i + 1));
+    return s.length ? s.join(' ') + (currentLang==='en'?' enable':' 使能') : (currentLang==='en'?'none':'无使能');
+  }
+  if (/^AC_Socket_Group\d$/.test(code)) return ({0: currentLang==='en'?'Keep':'保持', 1: currentLang==='en'?'ON':'打开', 2: currentLang==='en'?'OFF':'关闭'})[u16(b)] || u16(b);
+  if (code === 'APP_Del') return 'bitmask:0x' + u16(b).toString(16);
+  if (code === 'P1_Feedback') {
+    const op = b[0], res = b[1];
+    const opMap = currentLang==='en' ? {0x00:'Default',0x01:'Add',0x02:'Del'} : {0x00:'默认',0x01:'添加',0x02:'删除'};
+    const resMap = currentLang==='en' ? {0x00:'Start',0x01:'OK',0x02:'Fail'} : {0x00:'开始',0x01:'成功',0x02:'失败'};
+    return (opMap[op] || '?') + ' ' + (resMap[res] || '?');
+  }
+  if (code === 'Sched_Active') { const v = u16(b); const s = []; for (let i = 0; i < 5; i++) if (v & (1 << i)) s.push((currentLang==='en'?'Sched':'表') + (i + 1)); return s.length ? s.join(',') : '-'; }
+  if (/^Sched\d_TaskState$/.test(code)) { const v = u16(b); const s = []; for (let i = 0; i < 5; i++) if (v & (1 << i)) s.push((currentLang==='en'?'Task':'任务') + (i + 1)); return s.length ? s.join(',') : '-'; }
+  if (/^Sched\d_Task\d_Type$/.test(code)) return ({0: currentLang==='en'?'Standby':'待机', 1: currentLang==='en'?'Charge':'充电', 2: currentLang==='en'?'Discharge':'放电', 3: currentLang==='en'?'Self-use':'自发自用'})[u16(b)] || u16(b);
+  if (/^Sched\d_Task\d_(Start|End)$/.test(code)) {
+    const v = u16(b);
+    return ((v >> 8) & 0xFF).toString().padStart(2, '0') + ':' + (v & 0xFF).toString().padStart(2, '0');
+  }
+  if (code === 'P1_Alarm' || code === 'STACK_ALARM' || code === 'STACK_PROTECT') return (currentLang==='en'?'Alarm:':'告警码:') + u16(b);
+  if (code === 'Sys_Battery_Power' || code === 'Sys_Grid_Power') return u16s(b);
+  /* Pack temperatures carry a -40 offset in the wire value (raw 66 → 26 °C, raw 0
+     → -40 °C, etc.). Apply the offset and emit with one decimal for negative-safe
+     display. */
+  if (code === 'PACK_TEMP_MAX' || code === 'PACK_TEMP_MIN') return (u16(b) - 40);
+  // string SNs
+  if (def.len === 16 && (code.endsWith('_SN') || code === 'P1_Scan_SN')) {
+    if (isMissingSN(b)) return currentLang==='en'?'No SN':'无SN';
+    return ascii(b);
+  }
+  if (def.len === 4) return u32(b);
+  return u16(b);
+}
+
+function matchFields(addrMap, order, dpType, channel) {
+  const used = new Set();
+  const fields = [];
+  const isPackDP = (dpType >= 113 && dpType <= 117);
+  const info = getChanInfo(channel);
+  const sorted = [...FIELD_DEFS].sort((a, b) => b.len - a.len);
+
+  for (const def of sorted) {
+    const isPackField = /^PACK_/.test(def.code);
+    /* Strict rule: pack DPs (113-117) only match pack fields;
+       non-pack DPs match all non-pack fields regardless of channel
+       (a real frame may aggregate DP4/DP6 fields in any channel). */
+    if (isPackDP && !isPackField) continue;
+    if (!isPackDP && isPackField) continue;
+    const needed = def.len / 2;
+    const keys = [];
+    let ok = true;
+    for (let i = 0; i < needed; i++) {
+      const k = def.addr + i;
+      if (!addrMap.has(k) || used.has(k)) { ok = false; break; }
+      keys.push(k);
+    }
+    if (!ok) continue;
+    const full = new Uint8Array(def.len);
+    let off = 0;
+    for (const k of keys) { full.set(addrMap.get(k), off); off += 2; used.add(k); }
+    const raw = Array.from(full).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+    const val = parseValue(def, full);
+    const name = fieldLabel(def.code);
+    /* Pack distinction is now handled by the per-pack section header (PACK1/2/3/4/5)
+       at the table top — field names stay generic ("SN", "SOC", ...) so they
+       don't repeat the pack index on every row. */
+    /* Semantic owner = which device this field logically belongs to, derived from the
+       field's address range (not the wire channel that carried the bytes). */
+    const owner = semanticOwner(def, info, channel);
+    fields.push({ addr: def.addr, name, value: val, unit: def.unit, raw, owner, wireCh: channel });
+  }
+  /* Unmatched addresses — show raw but keep original order */
+  for (const [addr, val] of addrMap.entries()) {
+    if (used.has(addr)) continue;
+    const raw = Array.from(val).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+    fields.push({ addr, name: '0x' + addr.toString(16).padStart(4, '0').toUpperCase(), value: raw, unit: '? 未知', raw, owner: { type: 'unknown', group: 0, pack: 0 }, wireCh: channel });
+  }
+  const idx = new Map(); order.forEach((a, i) => idx.set(a, i));
+  fields.sort((a, b) => (idx.get(a.addr) ?? 9999) - (idx.get(b.addr) ?? 9999));
+  return fields;
+}
+
+/* Determine which *device* a field semantically belongs to, based on its address range. */
+function semanticOwner(def, wireInfo, wireCh) {
+  const a = def.addr;
+  if (def.code.startsWith('PACK_') && wireInfo.type === 'pack') {
+    return { type: 'pack', group: wireInfo.group, pack: wireInfo.pack, key: `pack:${wireInfo.group}:${wireInfo.pack}` };
+  }
+  if (a >= 0x0001 && a < 0x1000) {
+    return { type: 'p1', group: 0, pack: 0, key: 'p1' };
+  }
+  if (a >= 0x1000 && a < 0x2000) {
+    /* host range — group comes from wire channel for 0x10/0x20/0x30/0x40/0x50 */
+    const g = wireInfo.type === 'host' ? wireInfo.group : Math.max(1, Math.min(5, (a >> 8) & 0x0F));
+    return { type: 'host', group: g, pack: 0, key: `host:${g}` };
+  }
+  if (a >= 0x2000) {
+    /* pack range — prefer wire pack info, else heuristic */
+    if (wireInfo.type === 'pack') return { type: 'pack', group: wireInfo.group, pack: wireInfo.pack, key: `pack:${wireInfo.group}:${wireInfo.pack}` };
+    const g = Math.max(1, Math.min(5, Math.floor(wireCh / 0x0a)));
+    const p = Math.max(1, Math.min(5, wireCh % 0x0a));
+    return { type: 'pack', group: g, pack: p, key: `pack:${g}:${p}` };
+  }
+  return { type: 'unknown', group: 0, pack: 0, key: 'unknown' };
+}
+
+function ownerLabel(o) {
+  if (o.type === 'p1')   return 'P1 网关';
+  if (o.type === 'host') return `GROUP${o.group} 主机`;
+  if (o.type === 'pack') return `GROUP${o.group} 包${o.pack}`;
+  return '未知';
+}
+
+function parseRaw(bytes) {
+  /* The spec says 6 bytes per block. Some device frames (observed DP5 alarms) tack on
+     a 2-byte trailer "01 01" after each block, so a block becomes 8 bytes. We cannot
+     distinguish "real 01 01 trailer" from "01 01 that happens to be cmd + next-addr_hi"
+     by looking at any one byte, so we try BOTH interpretations and pick the one that
+     yields more recognized addresses. */
+  const a = parse6Strict(bytes);
+  const b = parse6WithExt(bytes);
+  return scoreParse(a) >= scoreParse(b) ? a : b;
+}
+
+function scoreParse(result) {
+  let s = 0;
+  for (const [, m] of result.channelMap) for (const a of m.keys())
+    if (FIELD_DEFS.some(f => f.addr === a)) s += 2;
+  for (const [, m] of result.channelMap) s += m.size * 0.1;  // tiebreaker
+  return s;
+}
+function parse6Strict(bytes) {
+  const payload = bytes.slice(2);
+  const cm = new Map(), co = new Map();
+  for (let i = 0; i + 5 < payload.length; i += 6) {
+    const ch = payload[i], addr = (payload[i + 2] << 8) | payload[i + 3];
+    const val = payload.slice(i + 4, i + 6);
+    if (!cm.has(ch)) { cm.set(ch, new Map()); co.set(ch, []); }
+    if (!cm.get(ch).has(addr)) { cm.get(ch).set(addr, val); co.get(ch).push(addr); }
+  }
+  return { channelMap: cm, channelOrder: co };
+}
+function parse6WithExt(bytes) {
+  const payload = bytes.slice(2);
+  const cm = new Map(), co = new Map();
+  let i = 0;
+  while (i + 5 < payload.length) {
+    const ch = payload[i], addr = (payload[i + 2] << 8) | payload[i + 3];
+    const val = payload.slice(i + 4, i + 6);
+    if (!cm.has(ch)) { cm.set(ch, new Map()); co.set(ch, []); }
+    if (!cm.get(ch).has(addr)) { cm.get(ch).set(addr, val); co.get(ch).push(addr); }
+    i += 6;
+    /* Only treat "01 01" as an ext trailer if it would leave a byte-aligned next block
+       that is also recognizable. Otherwise the "01 01" is just data (e.g. cmd=01 + next
+       addr_hi=01 in a strict-6-byte frame). */
+    if (i + 1 < payload.length && payload[i] === 0x01 && payload[i + 1] === 0x01
+        && i + 8 <= payload.length) {
+      i += 2;
+    }
+  }
+  return { channelMap: cm, channelOrder: co };
+}
+
+function runParse() {
+  parseRendered = true;
+  const bytes = bytesOf(hexInput.value);
+  if (!bytes) {
+    parseResult.innerHTML = `<div class="parse-summary danger">
+      <div class="ico"><svg class="icon"><use href="#i-x"/></svg></div>
+      <div><div class="lbl">${currentLang==='en'?'Error':'错误'}</div><div class="val">${hexInput.value ? t('parse_err_hex') : t('parse_err_empty')}</div></div>
+    </div>`;
+    parseMeta.textContent = t('parse_err_empty');
+    parseMeta.style.color = 'var(--danger)';
+    return;
+  }
+  if (bytes.length < 8) {
+    parseResult.innerHTML = `<div class="parse-summary danger">
+      <div class="ico"><svg class="icon"><use href="#i-x"/></svg></div>
+      <div><div class="lbl">${currentLang==='en'?'Error':'错误'}</div><div class="val">${t('parse_err_short')}</div></div>
+    </div>`;
+    parseMeta.textContent = t('parse_err_short');
+    return;
+  }
+  if (bytes[0] !== 0x03 || bytes[1] !== 0x01) {
+    parseResult.innerHTML = `<div class="parse-summary danger">
+      <div class="ico"><svg class="icon"><use href="#i-x"/></svg></div>
+      <div><div class="lbl">${t('parse_header_err')}</div><div class="val">${t('parse_err_header')} (got ${bytes[0].toString(16).padStart(2,'0')} ${bytes[1].toString(16).padStart(2,'0')})</div></div>
+    </div>`;
+    parseMeta.textContent = t('parse_header_err');
+    parseMeta.style.color = 'var(--danger)';
+    return;
+  }
+
+  const { channelMap, channelOrder } = parseRaw(bytes);
+  const dp = detectDP(channelMap);
+  const dpInfo = t('dp' + dp);
+  const isUnknown = !dpInfo || dpInfo === ('dp' + dp);
+
+  /* Flat list of all matched fields, sorted by *protocol spec order* (NOT address order).
+     The DP3 spec sheet, for example, lists P1 SN, P1 FW, then GROUP1..5 SN/FW/PCS/MPPT/Pack,
+     then P1 measurements — even though some of those addresses (e.g. 0x1001) numerically
+     come after others (e.g. 0x0114). The rank function below encodes the spec order. */
+  const allFields = [];
+  for (const [ch, addrMap] of channelMap.entries()) {
+    const order = channelOrder.get(ch) || [];
+    const fields = matchFields(addrMap, order, dp, ch);
+    for (const f of fields) allFields.push(f);
+  }
+  const BAND = (a) => a < 0x1000 ? 'p1' : a < 0x2000 ? 'host' : 'pack';
+  /* Within a band, sub-group identifies the section. The reading order matches
+     the protocol spec sheet (P1 system → STACK hosts → DP7 control → packs →
+     P1 measurements, which is the 14-field block *appended* by DP3/5/6/7/112):
+
+       p1 | 0  = P1 system          (0x0001, 0x0009)             — first
+       p1 | 3  = P1 status/misc     (0x0101, 0x0103, 0x010D-E,
+                                     0x0115, 0x0201, 0x0501-3,
+                                     0x0601)                      — after system
+       host| n = STACK n host       (0x1000-0x1FFF in GROUP n)   — middle (n=1..5)
+       p1 | 2  = DP7 control        (0x0301-0x030D, 0x0401-0x040D) — between hosts and packs
+       pack| 0 = pack data          (0x2000+)                    — late
+       p1 | 1  = P1 measurements    (0x0105-0x010C, 0x010F-0x0114) — LAST (appended)
+
+     The 14 P1 measurement fields are intentionally placed at the end so the
+     section order reads exactly like the protocol spec sheet. */
+  const isP1Measure = (a) => (a >= 0x0105 && a <= 0x010C) || (a >= 0x010F && a <= 0x0114);
+  const isDP7Control = (a) => (a >= 0x0301 && a <= 0x030D) || (a >= 0x0401 && a <= 0x040D);
+  const SUB = (addr) => {
+    if (addr < 0x0100) return 0;                          // P1 system
+    if (isDP7Control(addr)) return 2;                     // DP7 control (always its own section)
+    /* DP4 special: the 14 "P1 measurements" are NOT appended here — the DP4 spec
+       lists all P1 addresses (0x0101..0x0115) in a single contiguous block before
+       the stack sections, in plain address order. So we merge them into p1|3
+       (the "P1 status" sub) instead of parking them in the trailing p1|1. */
+    if (dp === 4) return 3;
+    if (isP1Measure(addr)) return 1;                      // P1 measurements (14 fields, rendered LAST for DP3/5/6/7/112)
+    if (addr < 0x1000) return 3;                          // other P1 (energy/WiFi/BLE/freq/alarm/schedule/interval)
+    if (addr < 0x2000) return -1;                         // host: resolved by wireCh below
+    return 0;                                              // pack
+  };
+  const SUB_HOST = (addr, wireCh) => groupIndex(wireCh); // 1..5
+  const SECTION_ORDER = (band, sub) => {
+    if (band === 'p1' && sub === 0) return 100;        // P1 system first
+    if (band === 'p1' && sub === 3) return 150;        // P1 status (energy/WiFi/BLE/...)
+    if (band === 'host') return 200 + sub;            // STACK1..5 in order
+    if (band === 'p1' && sub === 2) return 350;        // DP7 control (between hosts and packs)
+    if (band === 'pack') return 400;
+    if (band === 'p1' && sub === 1) return 500;        // P1 measurements — ALWAYS LAST (appended block)
+    return 999;
+  };
+  const SECTION_NAME = {
+    'p1|0':   { tag: 'P1',     title: currentLang==='en'?'P1 gateway':'P1 网关', desc: currentLang==='en'?'Gateway system: SN, firmware':'网关系统字段: SN、固件' },
+    'p1|3':   { tag: 'P1',     title: currentLang==='en'?'P1 data':'P1 数据', desc: currentLang==='en'?'P1 fields (energy / power / SOC / WiFi / BLE / freq / alarm / schedule / panel interval)':'P1 字段(能量、功率、SOC、连接、告警、计划、面板等;DP4 包含全部 P1 测量)' },
+    'host|1': { tag: 'STACK1',  title: currentLang==='en'?'Stack 1 (GROUP 1 host)':'电池堆1 (GROUP 1 主机)', desc: '主机 SN、固件、PCS 固件、MPPT 固件、Pack 数量' },
+    'host|2': { tag: 'STACK2',  title: currentLang==='en'?'Stack 2 (GROUP 2 host)':'电池堆2 (GROUP 2 主机)', desc: '主机 SN、固件、PCS 固件、MPPT 固件、Pack 数量' },
+    'host|3': { tag: 'STACK3',  title: currentLang==='en'?'Stack 3 (GROUP 3 host)':'电池堆3 (GROUP 3 主机)', desc: '主机 SN、固件、PCS 固件、MPPT 固件、Pack 数量' },
+    'host|4': { tag: 'STACK4',  title: currentLang==='en'?'Stack 4 (GROUP 4 host)':'电池堆4 (GROUP 4 主机)', desc: '主机 SN、固件、PCS 固件、MPPT 固件、Pack 数量' },
+    'host|5': { tag: 'STACK5',  title: currentLang==='en'?'Stack 5 (GROUP 5 host)':'电池堆5 (GROUP 5 主机)', desc: '主机 SN、固件、PCS 固件、MPPT 固件、Pack 数量' },
+    'control':{ tag: 'CTRL',    title: currentLang==='en'?'P1 control settings':'P1 控制设置', desc: currentLang==='en'?'DP7 settings: tariff, work mode, emergency, ECO, AC sockets, add/del flow':'DP7 设置参数: 电价、工作模式、应急电源、ECO、AC 插座、添加/删除流程' },
+    'pack|1': { tag: 'PACK1', title: currentLang==='en'?'Pack 1':'电池包1', desc: currentLang==='en'?'Pack 1 SN, firmware, SOC, SOH, temperature, voltage, cycles':'电池包1 SN、固件、SOC、SOH、温度、电压、循环次数' },
+    'pack|2': { tag: 'PACK2', title: currentLang==='en'?'Pack 2':'电池包2', desc: currentLang==='en'?'Pack 2 SN, firmware, SOC, SOH, temperature, voltage, cycles':'电池包2 SN、固件、SOC、SOH、温度、电压、循环次数' },
+    'pack|3': { tag: 'PACK3', title: currentLang==='en'?'Pack 3':'电池包3', desc: currentLang==='en'?'Pack 3 SN, firmware, SOC, SOH, temperature, voltage, cycles':'电池包3 SN、固件、SOC、SOH、温度、电压、循环次数' },
+    'pack|4': { tag: 'PACK4', title: currentLang==='en'?'Pack 4':'电池包4', desc: currentLang==='en'?'Pack 4 SN, firmware, SOC, SOH, temperature, voltage, cycles':'电池包4 SN、固件、SOC、SOH、温度、电压、循环次数' },
+    'pack|5': { tag: 'PACK5', title: currentLang==='en'?'Pack 5':'电池包5', desc: currentLang==='en'?'Pack 5 SN, firmware, SOC, SOH, temperature, voltage, cycles':'电池包5 SN、固件、SOC、SOH、温度、电压、循环次数' },
+    'p1|1':   { tag: 'P1',     title: currentLang==='en'?'P1 measurements':'P1 测量数据', desc: currentLang==='en'?'Grid ±P, L1/L2/L3 power, system SOC/capacity/battery/grid/PV (appended block)':'电网功率 ±P、L1/L2/L3 功率、系统 SOC/容量/电池/电网/光伏功率(末段拼接块)' },
+  };
+  function sectionKey(f) {
+    const b = BAND(f.addr);
+    if (b === 'p1') {
+      const s = SUB(f.addr);
+      if (s === 2) return 'control';                      // DP7 control gets its own section key
+      return 'p1|' + s;
+    }
+    if (b === 'host')  return 'host|' + SUB_HOST(f.addr, f.wireCh);
+    /* Pack: one section per pack index, mirroring the STACK per-group section
+       style (e.g. STACK2 电池堆2 ...). The pack index is the low nibble of the
+       wire channel (0x0b→1, 0x0c→2, ... 0x0f→5). */
+    if (b === 'pack') {
+      const info = getChanInfo(f.wireCh);
+      return 'pack|' + (info.pack || 0);
+    }
+    return 'pack|0';
+  }
+  function sectionRank(f) {
+    const b = BAND(f.addr);
+    let sub;
+    if (b === 'p1')     sub = SUB(f.addr);
+    else if (b === 'host') sub = SUB_HOST(f.addr, f.wireCh);
+    else                sub = 0;
+    return SECTION_ORDER(b, sub) * 10000 + protocolRank(f.addr, f.wireCh);
+  }
+  allFields.sort((a, b) => sectionRank(a) - sectionRank(b));
+
+  let html = `<div class="parse-summary ${isUnknown ? 'warn' : ''}">
+    <div class="ico"><svg class="icon"><use href="#i-${isUnknown ? 'info' : 'check'}"/></svg></div>
+    <div style="flex:1">
+      <div class="lbl">${t('parse_ok')}</div>
+      <div class="val">${isUnknown ? t('parse_unknown') : (dpInfo.name || 'DP' + dp)}${dp ? ` <span class="tag tag-dp">DP${dp}</span>` : ''}</div>
+    </div>
+    <div class="row gap-3 mono" style="font-size:11px; color:var(--fg-2);">
+      <span style="display:inline-flex; align-items:center; gap:4px"><svg class="icon icon-sm"><use href="#i-cpu"/></svg>${bytes.length} B</span><span>·</span>
+      <span style="display:inline-flex; align-items:center; gap:4px"><svg class="icon icon-sm"><use href="#i-list"/></svg>${allFields.length} ${t('parse_fields')}</span>
+    </div>
+  </div>`;
+
+  const secCounts = new Map();
+  for (const f of allFields) {
+    const k = sectionKey(f);
+    secCounts.set(k, (secCounts.get(k) || 0) + 1);
+  }
+
+  html += `<div class="result-table">`;
+  let curKey = null;
+  for (const f of allFields) {
+    const b = BAND(f.addr);
+    const k = sectionKey(f);
+    if (k !== curKey) {
+      curKey = k;
+      const sec = SECTION_NAME[k] || { tag: b.toUpperCase(), title: k, desc: '' };
+      html += `<div class="band-head band-${b}">
+        <span class="band-tag">${sec.tag}</span>
+        <span class="band-title">${sec.title}</span>
+        <span class="band-desc">${sec.desc}</span>
+        <span class="band-count">${secCounts.get(k)} ${currentLang==='en'?'fields':'字段'}</span>
+      </div>
+      <div class="result-row result-head">
+        <span class="r-name">${t('th_name')}</span>
+        <span class="r-addr">${t('th_addr')}</span>
+        <span class="r-val">${currentLang==='en'?'Value':'解析值'}</span>
+        <span class="r-raw">HEX</span>
+        <span class="r-ch">${currentLang==='en'?'Wire':'物理通道'}</span>
+      </div>`;
+    }
+    const chHex = '0x' + f.wireCh.toString(16).padStart(2, '0').toUpperCase();
+    let chLabel = chHex;
+    if (f.wireCh === 0x01) chLabel = 'P1';
+    else if (f.wireCh >= 0x0a && f.wireCh <= 0x32 && f.wireCh % 0x0a === 0) chLabel = 'G' + (f.wireCh / 0x0a);
+    else if (f.wireCh >= 0x0b && f.wireCh <= 0x37) chLabel = 'G' + Math.floor(f.wireCh/0x0a) + '·P' + (f.wireCh%0x0a);
+    html += `<div class="result-row">
+      <span class="r-name">${f.name}</span>
+      <span class="r-addr">0x${f.addr.toString(16).padStart(4,'0').toUpperCase()}</span>
+      <span class="r-val">${f.value}${f.unit ? ' <span class="unit">'+f.unit+'</span>' : ''}</span>
+      <span class="r-raw">${f.raw}</span>
+      <span class="r-ch">${chLabel}</span>
+    </div>`;
+  }
+  html += `</div>`;
+  parseResult.innerHTML = html;
+  parseMeta.textContent = `${isUnknown ? t('parse_unknown') : (dpInfo.name || 'DP' + dp)} · ${bytes.length} B · ${allFields.length} ${t('parse_fields')}`;
+  parseMeta.style.color = isUnknown ? 'var(--warn)' : 'var(--accent)';
+}
+
+function updateStats() {
+  const b = bytesOf(hexInput.value);
+  if (!b) {
+    hexStats.innerHTML = hexInput.value
+      ? `<svg class="icon icon-sm" style="vertical-align:-2px; margin-right:2px"><use href="#i-alert"/></svg>${currentLang==='en'?'Invalid':'无效'}`
+      : (currentLang==='en'?'0 B · 0 fields':'0 B · 0 字段');
+    hexStats.style.color = hexInput.value ? 'var(--warn)' : 'var(--fg-2)';
+    return;
+  }
+  hexStats.textContent = `${b.length} B`;
+  hexStats.style.color = 'var(--fg-2)';
+}
+
+document.getElementById('parseBtn').onclick = runParse;
+document.getElementById('clearBtn').onclick = () => {
+  hexInput.value = '';
+  parseRendered = false;
+  updateStats();
+  parseResult.innerHTML = `<div class="empty-state"><svg class="icon"><use href="#i-wrench"/></svg><div class="mt-2">${t('result_empty')}</div></div>`;
+  parseMeta.textContent = t('result_wait');
+  parseMeta.style.color = 'var(--fg-2)';
+};
+document.querySelectorAll('[data-sample]').forEach(btn => {
+  btn.onclick = () => {
+    hexInput.value = SAMPLES[btn.dataset.sample] || '';
+    updateStats();
+    runParse();
+  };
+});
+hexInput.addEventListener('input', updateStats);
+
+/* =========================================================
+   Overview page
+   ========================================================= */
+const DP_LIST = {
+  R:  [3, 4, 5, 6, 113, 114, 115, 116, 117],
+  RW: [7, 111, 112],
+  S:  [101, 102, 103, 104, 105, 106, 107, 108, 109, 110],
+};
+function renderOverview() {
+  const mkCard = (dp) => {
+    const info = t('dp' + dp) || { name: 'DP' + dp, code: '-', freq: '-', fields: 0, desc: '' };
+    const isStat = dp >= 101 && dp <= 110;
+    const isRW = DP_LIST.RW.includes(dp);
+    return `<div class="dp-card ${isRW ? 'rw' : ''}" data-goto="manual" data-dp="${dp}">
+      <div class="dp-id">DP${dp}</div>
+      <div class="dp-name">${info.name}</div>
+      <div class="dp-code">${info.code}</div>
+      <div class="dp-desc">${info.desc}</div>
+      <div class="dp-meta">
+        <span class="tag ${isRW?'tag-rw':'tag-r'}">${isRW?'RW':'R'}</span>
+        <span class="tag tag-mono">${info.freq}</span>
+        ${dp >= 113 && dp <= 117 ? '<span class="tag tag-new">NEW</span>' : ''}
+        ${isStat ? '<span class="tag tag-dp">5min</span>' : ''}
+      </div>
+      <div class="dp-stats"><span>${t('th_code')}</span><strong>${info.fields || 0} ${t('parse_fields')}</strong></div>
+    </div>`;
+  };
+  document.getElementById('dpGridR').innerHTML = DP_LIST.R.map(mkCard).join('');
+  document.getElementById('dpGridRW').innerHTML = DP_LIST.RW.map(mkCard).join('');
+  document.getElementById('dpGridStat').innerHTML = DP_LIST.S.map(mkCard).join('');
+  document.querySelectorAll('[data-goto="manual"]').forEach(c => {
+    c.onclick = () => { currentManualDP = +c.dataset.dp; showPage('manual'); };
+  });
+}
+
+/* =========================================================
+   Manual page
+   ========================================================= */
+/* Full protocol spec block for each DP (mirrors the xlsx "DP号 / DP名称 / DP CODE / 数据传输类型 / 数据类型 / 上报逻辑 / 数据格式 / 数据说明 / 举例" section). */
+const DP_PROTOCOL = {
+  3: {
+    rows: [
+      ['DP号',          'DP3'],
+      ['DP名称',        '设备信息'],
+      ['DP CODE',       'device_info'],
+      ['数据传输类型',  'R'],
+      ['数据类型',      'RAW(透传)'],
+      ['上报逻辑',      '注：每次上电/配网/新的电池堆添加/上报1次'],
+    ],
+    format: '首字节 | 第二个字节(类型)\n通道 | 指令码 | 寄存器地址 | 寄存器值\n通道 | 指令码 | 寄存器地址 | 寄存器值',
+    desc:   '通道:01 为 P1\n      10 为 1号电池堆主机\n      20 为 2号电池堆主机\n\n指令码:固定为01\n寄存器地址:两字节hex\n寄存器值:两字节hex',
+    example:'03 01 (首字节方案三, 01 类型, 这里都是01)\n01 01 0001 0000 (01 通道; 指的是P1; 01指令码; 0001 寄存器地址; 0000 内容)\n10 01 1001 0001 (10通道, 指的是1号电池堆, 主机; 01 指令码; 1001 寄存器地址; 0001 内容)\n20 01 1001 0001 (20通道, 指的是2号电池堆, 主机; 01 指令码; 1001 寄存器地址; 0001 内容)',
+  },
+  4: {
+    rows: [
+      ['DP号',          'DP4'],
+      ['DP名称',        '电池堆动态数据'],
+      ['DP CODE',       'stack_instant'],
+      ['数据传输类型',  'R'],
+      ['数据类型',      'RAW(透传)'],
+      ['上报逻辑',      '1分钟周期上报1次 (TBD)'],
+    ],
+    format: '首字节 | 第二个字节(类型)\n通道 | 指令码 | 寄存器地址 | 寄存器值',
+    desc:   '通道:01 为 P1; 10/20/30/40/50 为 1-5号电池堆主机',
+    example:'03 01\n01 01 0100 0001\n10 01 1100 0001\n20 01 1100 0001',
+  },
+  5: {
+    rows: [
+      ['DP号',          'DP5'],
+      ['DP名称',        '告警信息'],
+      ['DP CODE',       'alarm_message'],
+      ['数据传输类型',  'R'],
+      ['数据类型',      'RAW(透传)'],
+      ['上报逻辑',      '1分钟周期上报1次 (TBD)'],
+    ],
+    format: '首字节 | 第二个字节(类型)\n通道 | 指令码 | 寄存器地址 | 寄存器值',
+    desc:   '通道:01 为 P1; 10/20/30/40/50 为各电池堆主机; 11-15、21-25等为各堆电池包',
+    example:'03 01 01 01 0201 0000 ...',
+  },
+  6: {
+    rows: [
+      ['DP号',          'DP6'],
+      ['DP名称',        '设备心跳数据'],
+      ['DP CODE',       'model_data'],
+      ['数据传输类型',  'R'],
+      ['数据类型',      'RAW(透传)'],
+      ['上报逻辑',      '5秒周期上报1次 (TBD)'],
+    ],
+    format: '首字节 | 第二个字节(类型)\n通道 | 指令码 | 寄存器地址 | 寄存器值',
+    desc:   '通道:01 为 P1',
+    example:'03 01 01 01 0107 0000 ...',
+  },
+  7: {
+    rows: [
+      ['DP号',          'DP7'],
+      ['DP名称',        '设备功能设置'],
+      ['DP CODE',       'function_set'],
+      ['数据传输类型',  'RW'],
+      ['数据类型',      'RAW(透传)'],
+      ['通信逻辑',      '涂鸦平台发送给P1'],
+    ],
+    format: '首字节 | 第二个字节(类型)\n通道 | 指令码 | 寄存器地址 | 寄存器值',
+    desc:   '通道:01 为 P1; 10 为 1号电池堆主机; 11 开始为1号电池堆的电池包; 11、12分别表示该电池包',
+    example:'03 01 01 01 0301 0000 ...',
+  },
+  111: {
+    rows: [
+      ['DP号',          'DP111'],
+      ['DP名称',        '计划模式参数设置'],
+      ['DP CODE',       'plan_mode_set'],
+      ['数据传输类型',  'RW'],
+      ['数据类型',      'RAW(透传)'],
+      ['通信逻辑',      '涂鸦平台发送给P1'],
+    ],
+    format: '首字节 | 第二个字节(类型)\n通道 | 指令码 | 寄存器地址 | 寄存器值',
+    desc:   '通道:01 为 P1',
+    example:'03 01 01 01 0501 0000 ...',
+  },
+  112: {
+    rows: [
+      ['DP号',          'DP112'],
+      ['DP名称',        '面板心跳数据获取'],
+      ['DP CODE',       'panel_heartbeat_data'],
+      ['数据传输类型',  'RW'],
+      ['数据类型',      'RAW(透传)'],
+      ['通信逻辑',      '涂鸦平台向P1查询, P1返回数据'],
+    ],
+    format: '首字节 | 第二个字节(类型)\n通道 | 指令码 | 寄存器地址 | 寄存器值',
+    desc:   '通道:01 为 P1',
+    example:'03 01 01 01 0601 0000 ...',
+  },
+  113: {
+    rows: [
+      ['DP号',          'DP113'],
+      ['DP名称',        '电池堆1电池数据'],
+      ['DP CODE',       'stack1_pack_instant'],
+      ['数据传输类型',  'R'],
+      ['数据类型',      'RAW(透传)'],
+      ['上报逻辑',      '1分钟周期上报1次 (TBD)'],
+    ],
+    format: '首字节 | 第二个字节(类型)\n通道 | 指令码 | 寄存器地址 | 寄存器值',
+    desc:   '通道:11-15 为1号电池堆 电池包1-5',
+    example:'03 01 11 01 2001 5041 ...',
+  },
+  114: {
+    rows: [
+      ['DP号',          'DP114'],
+      ['DP名称',        '电池堆2电池数据'],
+      ['DP CODE',       'stack2_pack_instant'],
+      ['数据传输类型',  'R'],
+      ['数据类型',      'RAW(透传)'],
+      ['上报逻辑',      '1分钟周期上报1次 (TBD)'],
+    ],
+    format: '首字节 | 第二个字节(类型)\n通道 | 指令码 | 寄存器地址 | 寄存器值',
+    desc:   '通道:21-25 为2号电池堆 电池包1-5',
+    example:'03 01 21 01 2001 5041 ...',
+  },
+  115: {
+    rows: [
+      ['DP号',          'DP115'],
+      ['DP名称',        '电池堆3电池数据'],
+      ['DP CODE',       'stack3_pack_instant'],
+      ['数据传输类型',  'R'],
+      ['数据类型',      'RAW(透传)'],
+      ['上报逻辑',      '1分钟周期上报1次 (TBD)'],
+    ],
+    format: '首字节 | 第二个字节(类型)\n通道 | 指令码 | 寄存器地址 | 寄存器值',
+    desc:   '通道:31-35 为3号电池堆 电池包1-5',
+    example:'03 01 31 01 2001 5041 ...',
+  },
+  116: {
+    rows: [
+      ['DP号',          'DP116'],
+      ['DP名称',        '电池堆4电池数据'],
+      ['DP CODE',       'stack4_pack_instant'],
+      ['数据传输类型',  'R'],
+      ['数据类型',      'RAW(透传)'],
+      ['上报逻辑',      '1分钟周期上报1次 (TBD)'],
+    ],
+    format: '首字节 | 第二个字节(类型)\n通道 | 指令码 | 寄存器地址 | 寄存器值',
+    desc:   '通道:41-45 为4号电池堆 电池包1-5',
+    example:'03 01 41 01 2001 5041 ...',
+  },
+  117: {
+    rows: [
+      ['DP号',          'DP117'],
+      ['DP名称',        '电池堆5电池数据'],
+      ['DP CODE',       'stack5_pack_instant'],
+      ['数据传输类型',  'R'],
+      ['数据类型',      'RAW(透传)'],
+      ['上报逻辑',      '1分钟周期上报1次 (TBD)'],
+    ],
+    format: '首字节 | 第二个字节(类型)\n通道 | 指令码 | 寄存器地址 | 寄存器值',
+    desc:   '通道:51-55 为5号电池堆 电池包1-5',
+    example:'03 01 51 01 2001 5041 ...',
+  },
+  // DP101-110
+  101: { rows:[['DP号','DP101'],['DP名称','当日累计充电电量'],['DP CODE','day_charge_energy'],['数据传输类型','只上报(or)'],['数据类型','数值型(Value)'],['通信逻辑','每5分钟上报一次']], format:'', desc:'', example:'家庭当日 PV+AC 总充电 kWh' },
+  102: { rows:[['DP号','DP102'],['DP名称','当年累计充电电量'],['DP CODE','year_charge_energy'],['数据传输类型','只上报(or)'],['数据类型','数值型(Value)'],['通信逻辑','每5分钟上报一次']], format:'', desc:'', example:'家庭当年总充电 kWh' },
+  103: { rows:[['DP号','DP103'],['DP名称','当日累计放电电量'],['DP CODE','day_discharge_energy'],['数据传输类型','只上报(or)'],['数据类型','数值型(Value)'],['通信逻辑','每5分钟上报一次']], format:'', desc:'', example:'家庭当日总放电 kWh' },
+  104: { rows:[['DP号','DP104'],['DP名称','当年累计放电电量'],['DP CODE','year_discharge_energy'],['数据传输类型','只上报(or)'],['数据类型','数值型(Value)'],['通信逻辑','每5分钟上报一次']], format:'', desc:'', example:'家庭当年总放电 kWh' },
+  105: { rows:[['DP号','DP105'],['DP名称','当日光伏总发电电量'],['DP CODE','day_pv_generation'],['数据传输类型','只上报(or)'],['数据类型','数值型(Value)'],['通信逻辑','每5分钟上报一次']], format:'', desc:'', example:'家庭当日光伏总发电 kWh' },
+  106: { rows:[['DP号','DP106'],['DP名称','当年光伏总发电电量'],['DP CODE','year_pv_generation'],['数据传输类型','只上报(or)'],['数据类型','数值型(Value)'],['通信逻辑','每5分钟上报一次']], format:'', desc:'', example:'家庭当年光伏总发电 kWh' },
+  107: { rows:[['DP号','DP107'],['DP名称','当日电网口总用电量'],['DP CODE','day_grid_consumption'],['数据传输类型','只上报(or)'],['数据类型','数值型(Value)'],['通信逻辑','每5分钟上报一次']], format:'', desc:'', example:'家庭当日电网口总用电 kWh' },
+  108: { rows:[['DP号','DP108'],['DP名称','当年电网口总用电量'],['DP CODE','year_grid_consumption'],['数据传输类型','只上报(or)'],['数据类型','数值型(Value)'],['通信逻辑','每5分钟上报一次']], format:'', desc:'', example:'家庭当年电网口总用电 kWh' },
+  109: { rows:[['DP号','DP109'],['DP名称','当日电网口总发电量'],['DP CODE','day_grid_generation'],['数据传输类型','只上报(or)'],['数据类型','数值型(Value)'],['通信逻辑','每5分钟上报一次']], format:'', desc:'', example:'家庭当日电池→电网总电量' },
+  110: { rows:[['DP号','DP110'],['DP名称','当年电网口总发电量'],['DP CODE','year_grid_generation'],['数据传输类型','只上报(or)'],['数据类型','数值型(Value)'],['通信逻辑','每5分钟上报一次']], format:'', desc:'', example:'家庭当年电池→电网总电量' },
+};
+
+/* Spec-sheet address order per DP. The protocol interleaves P1 / GROUP / measurement
+   fields in a way that a plain address sort cannot reproduce (e.g. DP3 spec lists
+   0x1001 GROUP SN before 0x0105 grid power, but 0x1001 > 0x0105 numerically).
+   This map encodes the human-readable order from each DP's protocol sheet so
+   the field manual table reads top-to-bottom the way the spec does. */
+const MANUAL_FIELD_ORDER = {
+  3: [0x0001, 0x0009, 0x1001, 0x1009, 0x100A, 0x100B, 0x100C, 0x0105, 0x0106, 0x0107, 0x0108, 0x0109, 0x010A, 0x010B, 0x010C, 0x010F, 0x0110, 0x0111, 0x0112, 0x0113, 0x0114],
+  4: [0x0101, 0x0103, 0x0105, 0x0106, 0x0107, 0x0108, 0x0109, 0x010A, 0x010B, 0x010C, 0x010D, 0x010E, 0x010F, 0x0110, 0x0111, 0x0112, 0x0113, 0x0114, 0x0115, 0x1101, 0x1102, 0x1103, 0x1104, 0x1105, 0x1106, 0x1107, 0x1108],
+  5: [0x0201, 0x1201, 0x1202, 0x0105, 0x0106, 0x0107, 0x0108, 0x0109, 0x010A, 0x010B, 0x010C, 0x010F, 0x0110, 0x0111, 0x0112, 0x0113, 0x0114],
+  6: [0x0105, 0x0106, 0x0107, 0x0108, 0x0109, 0x010A, 0x010B, 0x010C, 0x010D, 0x010E, 0x010F, 0x0110, 0x0111, 0x0112, 0x0113, 0x0114],
+  7: [0x0301, 0x0302, 0x0303, 0x0304, 0x0305, 0x0306, 0x0307, 0x0308, 0x0309, 0x030A, 0x030B, 0x030C, 0x030D, 0x0401, 0x0402, 0x0403, 0x0404, 0x0405, 0x040D, 0x0105, 0x0106, 0x0107, 0x0108, 0x0109, 0x010A, 0x010B, 0x010C, 0x010F, 0x0110, 0x0111, 0x0112, 0x0113, 0x0114],
+  112: [0x0601, 0x0105, 0x0106, 0x0107, 0x0108, 0x0109, 0x010A, 0x010B, 0x010C, 0x010F, 0x0110, 0x0111, 0x0112, 0x0113, 0x0114],
+};
+function sortByProtocolOrder(fields, dp) {
+  const order = MANUAL_FIELD_ORDER[dp];
+  if (!order || order.length === 0) return fields.slice().sort((a, b) => a.addr - b.addr);
+  const idx = new Map(order.map((a, i) => [a, i]));
+  return fields.slice().sort((a, b) => {
+    const ia = idx.has(a.addr) ? idx.get(a.addr) : 1e9;
+    const ib = idx.has(b.addr) ? idx.get(b.addr) : 1e9;
+    if (ia !== ib) return ia - ib;
+    return a.addr - b.addr;  // tie-break: address asc
+  });
+}
+
+function renderManual() {
+  const dp = currentManualDP;
+  const cardInfo = t('dp' + dp) || { name: 'DP' + dp, code: '-', freq: '-', fields: 0, desc: '' };
+  document.getElementById('manualTitle').textContent = `DP${dp} · ${cardInfo.name}`;
+  document.getElementById('manualMeta').textContent = `${cardInfo.code} · ${cardInfo.freq} · ${cardInfo.fields} ${t('parse_fields')}`;
+
+  // pick field set
+  const isStat = dp >= 101 && dp <= 110;
+  const isRW = DP_LIST.RW.includes(dp);
+  let set;
+  if (isStat) {
+    set = [{ addr: 0, code: `DP${dp}_ENERGY`, len: 4, unit: 'kWh' }];
+    FIELD_LABEL[`DP${dp}_ENERGY`] = { zh: cardInfo.name, en: cardInfo.name };
+  } else {
+    // show fields relevant to DP
+    set = FIELD_DEFS.filter(f => {
+      if (dp === 3) return [0x0001, 0x0009, 0x1001, 0x1009, 0x100A, 0x100B, 0x100C, 0x0105, 0x0106, 0x0107, 0x0108, 0x0109, 0x010A, 0x010B, 0x010C, 0x010F, 0x0110, 0x0111, 0x0112, 0x0113, 0x0114].includes(f.addr);
+      if (dp === 4) return [0x0101, 0x0103, 0x0105, 0x0106, 0x0107, 0x0108, 0x0109, 0x010A, 0x010B, 0x010C, 0x010D, 0x010E, 0x010F, 0x0110, 0x0111, 0x0112, 0x0113, 0x0114, 0x0115, 0x1101, 0x1102, 0x1103, 0x1104, 0x1105, 0x1106, 0x1107, 0x1108].includes(f.addr);
+      if (dp === 5) return [0x0201, 0x1201, 0x1202, 0x0105, 0x0106, 0x0107, 0x0108, 0x0109, 0x010A, 0x010B, 0x010C, 0x010F, 0x0110, 0x0111, 0x0112, 0x0113, 0x0114].includes(f.addr);
+      if (dp === 6) return [0x0105, 0x0106, 0x0107, 0x0108, 0x0109, 0x010A, 0x010B, 0x010C, 0x010D, 0x010E, 0x010F, 0x0110, 0x0111, 0x0112, 0x0113, 0x0114].includes(f.addr);
+      if (dp === 7) return [0x0301, 0x0302, 0x0303, 0x0304, 0x0305, 0x0306, 0x0307, 0x0308, 0x0309, 0x030A, 0x030B, 0x030C, 0x030D, 0x0401, 0x0402, 0x0403, 0x0404, 0x0405, 0x040D, 0x0105, 0x0106, 0x0107, 0x0108, 0x0109, 0x010A, 0x010B, 0x010C, 0x010F, 0x0110, 0x0111, 0x0112, 0x0113, 0x0114].includes(f.addr);
+      if (dp === 111) return f.addr >= 0x0501 && f.addr <= 0x0551;
+      if (dp === 112) return [0x0601, 0x0105, 0x0106, 0x0107, 0x0108, 0x0109, 0x010A, 0x010B, 0x010C, 0x010F, 0x0110, 0x0111, 0x0112, 0x0113, 0x0114].includes(f.addr);
+      if (dp >= 113 && dp <= 117) return /^PACK_/.test(f.code);
+      return false;
+    });
+    /* Sort the filtered set by the protocol spec order (not by address). The spec
+       interleaves P1 / GROUP / measurement fields, so a plain address sort
+       puts e.g. 0x0105 before 0x1001 which reads wrong. */
+    set = sortByProtocolOrder(set, dp);
+  }
+
+  /* Build the full protocol spec block (the xlsx top section) */
+  const proto = DP_PROTOCOL[dp];
+  const protoHtml = proto ? `
+    <div class="manual-proto">
+      <div class="manual-proto-head">
+        <svg class="icon" style="color:var(--info)"><use href="#i-info"/></svg>
+        <span>协议规范 (Protocol Spec)</span>
+      </div>
+      <div class="manual-proto-body">
+        ${proto.rows.map(([k, v]) => `<div class="manual-proto-row"><span class="manual-proto-k">${k}</span><span class="manual-proto-v mono">${v}</span></div>`).join('')}
+        ${proto.format ? `<div class="manual-proto-row"><span class="manual-proto-k">数据格式</span><pre class="manual-proto-v manual-proto-pre">${proto.format}</pre></div>` : ''}
+        ${proto.desc   ? `<div class="manual-proto-row"><span class="manual-proto-k">数据说明</span><pre class="manual-proto-v manual-proto-pre">${proto.desc}</pre></div>` : ''}
+        ${proto.example? `<div class="manual-proto-row"><span class="manual-proto-k">举例</span><pre class="manual-proto-v manual-proto-pre">${proto.example}</pre></div>` : ''}
+      </div>
+    </div>` : '';
+
+  const fieldTableHtml = `
+    <div class="card" style="margin-top:14px">
+      <div class="card-body" style="padding:0">
+        <div class="table-scroll">
+          <table class="field-table">
+            <thead><tr><th data-i18n="th_addr">地址</th><th data-i18n="th_code">标识符</th><th data-i18n="th_name">名称</th><th data-i18n="th_len">长度</th><th data-i18n="th_unit">单位/说明</th></tr></thead>
+            <tbody>${set.map(f => {
+            const addrText = f.addr === 0 ? '-' : ('0x' + f.addr.toString(16).padStart(4, '0').toUpperCase());
+            const codeText = f.code;
+            const nameText = fieldLabel(f.code);
+            const lenText = f.len + ' B';
+            const unitText = f.unit || '-';
+            return `<tr>
+              <td class="addr">${addrText}</td>
+              <td class="mono" style="font-size:11px">${codeText}</td>
+              <td class="name">${nameText}</td>
+              <td>${lenText}</td>
+              <td class="muted">${unitText}</td>
+            </tr>`;
+          }).join('')}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>`;
+
+  document.getElementById('manualBody').innerHTML = fieldTableHtml;
+}
+
+/* =========================================================
+   Faults page
+   ========================================================= */
+const SEV = { crit: 'crit', high: 'high', med: 'med' };
+const FAULT_P1 = [
+  { code: 1, zh: 'P1与电表通信异常', en: 'P1 communication error with electric meter', sev: 'high' },
+];
+const FAULT_GA = [
+  { code: 1,  zh:'欠压保护',         en:'Under-voltage',      sev: 'crit' },
+  { code: 6,  zh:'AC 过载保护',      en:'AC overload',        sev: 'high' },
+  { code: 7,  zh:'过功率一级',       en:'Over-power L1',      sev: 'high' },
+  { code: 8,  zh:'过功率二级',       en:'Over-power L2',      sev: 'high' },
+  { code: 9,  zh:'过功率三级',       en:'Over-power L3',      sev: 'crit' },
+  { code: 10, zh:'过功率四级',       en:'Over-power L4',      sev: 'crit' },
+  { code: 11, zh:'BMS 通信异常',     en:'BMS comm error',     sev: 'high' },
+  { code: 12, zh:'PCS 通信异常',     en:'PCS comm error',     sev: 'high' },
+  { code: 21, zh:'PV 充电过功率',    en:'PV over-charge power', sev: 'med' },
+];
+const FAULT_GP = [
+  { code: 2,  zh:'BMS 欠压保护',     en:'BMS under-voltage',  sev: 'crit' },
+  { code: 3,  zh:'BMS 放电温度',     en:'BMS discharge temp', sev: 'high' },
+  { code: 4,  zh:'BMS 充电温度',     en:'BMS charge temp',    sev: 'high' },
+  { code: 5,  zh:'BMS MOS 温度',     en:'BMS MOS temp',       sev: 'high' },
+  { code: 6,  zh:'BMS 预放电保护',   en:'BMS pre-discharge',  sev: 'med' },
+  { code: 7,  zh:'BMS 充电过流',     en:'BMS charge over-current', sev: 'crit' },
+  { code: 8,  zh:'BMS 放电过流',     en:'BMS discharge over-current', sev: 'crit' },
+  { code: 9,  zh:'BMS 短路保护',     en:'BMS short circuit',  sev: 'crit' },
+  { code: 10, zh:'BMS 压差故障',     en:'BMS voltage diff',   sev: 'med' },
+  { code: 11, zh:'BMS 低压故障',     en:'BMS low voltage',    sev: 'high' },
+  { code: 62, zh:'PCS 过温保护',     en:'PCS overheat',       sev: 'high' },
+  { code: 63, zh:'PCS 电压异常',     en:'PCS voltage',        sev: 'high' },
+  { code: 64, zh:'PCS 频率异常',     en:'PCS frequency',      sev: 'high' },
+  { code: 65, zh:'PCS 输出电压',     en:'PCS output voltage', sev: 'high' },
+  { code: 66, zh:'PCS 输出短路',     en:'PCS output short',   sev: 'crit' },
+  { code: 67, zh:'PCS 输出过载',     en:'PCS output overload',sev: 'high' },
+  { code: 68, zh:'PCS 内部故障',     en:'PCS internal',       sev: 'crit' },
+  { code: 69, zh:'PCS 光伏过压',     en:'PCS PV overvoltage', sev: 'high' },
+  { code: 70, zh:'PCS 光伏过流',     en:'PCS PV overcurrent', sev: 'high' },
+];
+function faultName(item) {
+  return currentLang === 'en' ? item.en : item.zh;
+}
+function renderFaults() {
+  const mk = (list) => list.map(f => `
+    <div class="fault-chip ${f.sev}" data-tip="${t('th_code')}: ${f.code}">
+      <div class="code">${f.code}</div>
+      <div class="name">${faultName(f)}</div>
+    </div>
+  `).join('');
+  document.getElementById('faultP1').innerHTML = mk(FAULT_P1);
+  document.getElementById('faultGroupAlarm').innerHTML = mk(FAULT_GA);
+  document.getElementById('faultGroupProtect').innerHTML = mk(FAULT_GP);
+  document.querySelectorAll('.fault-chip').forEach(c => {
+    c.onclick = () => {
+      const code = c.querySelector('.code').textContent;
+      navigator.clipboard?.writeText(code);
+      c.style.boxShadow = '0 0 0 2px var(--accent)';
+      setTimeout(() => c.style.boxShadow = '', 600);
+    };
+  });
+}
+
+/* =========================================================
+   Changelog
+   ========================================================= */
+const CHANGELOG = [
+  { v: 'V1.0.8', date: '2026.08.31', note: { zh: '新增电池包 X 电池数据 DP(DP113-DP117)', en: 'Add pack X data DP (DP113-DP117)' }, who: 'Mr. Bao' },
+  { v: 'V1.0.7', date: '2026.05.28', note: { zh: '更新系统电池/电网/光伏功率单位为 W;更新组包内容;更新 DP112', en: 'Update power units to W; update pack content; update DP112' }, who: 'Mr. Liang' },
+  { v: 'V1.0.6', date: '2026.05.14', note: { zh: '更新 DP112 面板心跳数据获取协议', en: 'Update DP112 panel heartbeat protocol' }, who: 'Mr. Liang' },
+  { v: 'V1.0.5', date: '2026.04.01', note: { zh: '更新 DP5 故障码表', en: 'Update DP5 fault codes' }, who: 'Mr. Liang' },
+  { v: 'V1.0.4', date: '2026.02.27', note: { zh: '增加 DP3 电池堆 Pack 接入数量', en: 'Add DP3 stack pack count' }, who: 'Mr. Liang' },
+  { v: 'V1.0.3', date: '2026.02.10', note: { zh: '增加计划模式 DP9 参数配置', en: 'Add plan mode DP9 config' }, who: 'Mr. Liang' },
+  { v: 'V1.0.2', date: '2026.02.01', note: { zh: '优化 DP 数据内容', en: 'Optimize DP data' }, who: 'Mr. Liang' },
+  { v: 'V1.0.1', date: '2025.12.04', note: { zh: '优化 DP 数据;增加电量统计 DP101~DP110;配对新堆逻辑', en: 'Optimize DP; add energy stats DP101-110; pairing flow' }, who: 'Mr. Liang' },
+  { v: 'V1.0.0', date: '2025.11.05', note: { zh: '初版', en: 'Initial release' }, who: 'Mr. Liang' },
+];
+function renderChangelog() {
+  document.getElementById('changelogBody').innerHTML = CHANGELOG.map(c => `
+    <tr>
+      <td><span class="tag tag-dp">${c.v}</span></td>
+      <td class="mono">${c.date}</td>
+      <td>${typeof c.note === 'object' ? (currentLang==='en' ? c.note.en : c.note.zh) : c.note}</td>
+      <td class="muted">${c.who}</td>
+    </tr>
+  `).join('');
+}
+
+/* =========================================================
+   Keyboard shortcut
+   ========================================================= */
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+    e.preventDefault();
+    showPage('parser');
+    setTimeout(() => hexInput.focus(), 100);
+  }
+});
+
+/* =========================================================
+   Boot
+   ========================================================= */
+applyTheme();
+applyLang();
+const _p = new URLSearchParams(location.search);
+showPage(_p.get('page') || 'parser');
+updateStats();
+/* optional auto-load sample via ?sample=dp3 or raw log via ?raw=<urlencoded-hex> */
+if (_p.get('sample') && SAMPLES[_p.get('sample')]) {
+  hexInput.value = SAMPLES[_p.get('sample')];
+  updateStats();
+  runParse();
+} else if (_p.get('raw')) {
+  try {
+    hexInput.value = decodeURIComponent(_p.get('raw'));
+    updateStats();
+    runParse();
+  } catch (e) { console.warn('bad raw param', e); }
+}
+</script>
+</body>
+</html>
